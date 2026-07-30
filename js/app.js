@@ -127,69 +127,68 @@ function handleExcelImport(event) {
 // 3. LOGIKA MEMBANGUN STRUKTUR TREE BERDASARKAN PARENT ID
 // ==========================================
 function buildTreeFromExcelData(rows) {
-  const container = document.getElementById('treeContainer');
-  if (!container) return;
-
-  // 1. Bersihkan wadah tree
-  container.innerHTML = '';
-
   if (!rows || rows.length === 0) {
     alert("Data Excel kosong atau tidak terbaca!");
     return;
   }
 
-  const nodeDOMMap = {};
-
-  rows.forEach((row, index) => {
-    // A. Normalisasi pembacaan Properti dari berbagai kemungkinan nama kolom Excel
-    const id = (row.id || row.ID || row['Kode KPI'] || row['ID KPI'] || `node-${index + 1}`).toString().trim();
-    const name = row.name || row.Name || row['Nama KPI'] || row.kpi_name || 'KPI Tanpa Nama';
-    const level = row.level || row.Level || row['Level KPI'] || 'L1';
-    const owner = row.owner || row.Owner || row['Unit Owner'] || '-';
+  // 1. Map data dari header Excel persis seperti di gambar
+  const formattedNodes = rows.map((row) => {
+    // Membaca kolom ID, Level, Unit Owner, Nama KPI, Parent ID
+    const id = String(row['ID'] || row['id'] || '').trim();
+    const level = String(row['Level'] || row['level'] || 'L1').trim();
+    const owner = String(row['Unit Owner'] || row['unit_owner'] || row['owner'] || '').trim();
+    const name = String(row['Nama KPI'] || row['nama_kpi'] || row['name'] || '').trim();
     
-    // Ambil parent ID (bisa string, number, atau null/empty)
-    let parentId = row.parentId || row.parent_id || row['Parent ID'] || row['ID Parent'] || row['KPI Induk'] || null;
-    if (parentId) parentId = parentId.toString().trim();
+    let parentId = row['Parent ID'] || row['parent_id'] || row['ParentId'] || null;
+    if (parentId) parentId = String(parentId).trim();
 
-    // B. Buat Elemen DOM Node (Gunakan createTreeNodeDOM jika ada, atau buat fallback card jika belum ada)
-    let nodeCard;
-    if (typeof createTreeNodeDOM === 'function') {
-      nodeCard = createTreeNodeDOM({ id, name, level, owner, parentId });
+    return {
+      id: id,
+      level: level,
+      owner: owner,
+      name: name,
+      parentId: parentId || null,
+      children: []
+    };
+  });
+
+  // 2. Susun hirarki Parent-Child (Flat array ke Tree structure)
+  const nodeMap = {};
+  const rootNodes = [];
+
+  // Masukkan ke Map
+  formattedNodes.forEach(node => {
+    nodeMap[node.id] = node;
+  });
+
+  // Hubungkan anak ke induknya
+  formattedNodes.forEach(node => {
+    if (node.parentId && nodeMap[node.parentId]) {
+      nodeMap[node.parentId].children.push(node);
     } else {
-      // Fallback sederhana jika fungsi createTreeNodeDOM tidak ditemukan
-      nodeCard = document.createElement('div');
-      nodeCard.className = "bg-white p-3 rounded-xl border border-teal-100 shadow-sm my-2 flex items-center justify-between";
-      nodeCard.setAttribute('data-id', id);
-      nodeCard.innerHTML = `
-        <div>
-          <span class="text-xs px-2 py-0.5 bg-teal-100 text-teal-800 rounded font-bold mr-2">${level}</span>
-          <strong class="text-slate-800 text-sm">${name}</strong>
-          <span class="text-xs text-slate-500 ml-2">(${owner})</span>
-        </div>
-      `;
-    }
-
-    // Simpan ke Map
-    nodeDOMMap[id] = nodeCard;
-
-    // C. Tempelkan ke Hirarki UI (Anak ke Parent, atau ke Container Utama)
-    if (parentId && nodeDOMMap[parentId]) {
-      let childContainer = nodeDOMMap[parentId].querySelector('.tree-children');
-      if (!childContainer) {
-        childContainer = document.createElement('div');
-        childContainer.className = 'tree-children ml-6 pl-4 border-l-2 border-teal-300 mt-2 space-y-2';
-        nodeDOMMap[parentId].appendChild(childContainer);
-      }
-      childContainer.appendChild(nodeCard);
-    } else {
-      // Masukkan ke wadah utama (Root level)
-      container.appendChild(nodeCard);
+      rootNodes.push(node); // Jika tidak punya Parent ID, maka dia Root (L1)
     }
   });
 
-  // 2. Refresh UI Validasi dan Dropdown
-  if (typeof runValidation === 'function') runValidation();
+  // 3. Timpa state global treeData milik aplikasi kamu
+  if (typeof treeData !== 'undefined') {
+    treeData = rootNodes;
+  }
+
+  // 4. Panggil fungsi render bawaan UI kamu
+  // (Coba panggil fungsi render utama aplikasi)
+  if (typeof renderTree === 'function') {
+    renderTree();
+  } else if (typeof renderTreeBuilder === 'function') {
+    renderTreeBuilder();
+  } else if (typeof renderTreeUI === 'function') {
+    renderTreeUI();
+  }
+
+  // 5. Update pilihan Parent di Form Halaman 2 dan jalankan Validasi
   if (typeof populateParentDropdowns === 'function') populateParentDropdowns();
+  if (typeof runValidation === 'function') runValidation();
 }
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
