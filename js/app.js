@@ -127,73 +127,74 @@ function handleExcelImport(event) {
 // 3. LOGIKA MEMBANGUN STRUKTUR TREE BERDASARKAN PARENT ID
 // ==========================================
 function buildTreeFromExcelData(rows) {
-  if (!rows || !Array.isArray(rows) || rows.length === 0) {
-    alert("Data Excel kosong atau tidak terbaca!");
+  const container = document.getElementById('treeContainer');
+  if (!container) return;
+
+  container.innerHTML = ''; // Restrukturasi ulang container
+
+  if (!rows || rows.length === 0) {
+    alert("Data Excel kosong!");
     return;
   }
 
-  // 1. Map data dari header Excel
-  const rawNodes = rows.map((row) => ({
-    id: String(row['ID'] || row['id'] || '').trim(),
-    level: String(row['Level'] || row['level'] || 'L1').trim(),
-    owner: String(row['Unit Owner'] || row['unit_owner'] || '').trim(),
-    name: String(row['Nama KPI'] || row['nama_kpi'] || '').trim(),
-    parentId: (row['Parent ID'] || row['parent_id'] || null) ? String(row['Parent ID'] || row['parent_id']).trim() : null
-  }));
+  const nodeDOMMap = {};
 
-  // 2. Susun objek Map dengan dukungan fleksibel untuk berbagai nama properti children bawaan UI
-  const nodeMap = {};
-  const rootNodes = [];
+  // Langkah 1: Buat semua node DOM menggunakan deserializeNode bawaan kamu
+  rows.forEach((row, index) => {
+    const id = row['ID'] ? String(row['ID']).trim() : ('node-' + Date.now() + '-' + index);
+    const level = row['Level'] ? String(row['Level']).toUpperCase().trim() : 'L1';
+    const owner = row['Unit Owner'] || '';
+    const title = row['Nama KPI'] || '';
+    const parentId = row['Parent ID'] ? String(row['Parent ID']).trim() : null;
 
-  rawNodes.forEach(item => {
-    // Buat format node universal yang mencakup berbagai nama properti children
-    nodeMap[item.id] = {
-      id: item.id,
-      level: item.level,
-      owner: item.owner,
-      name: item.name,
-      parentId: item.parentId,
-      // Sediakan beberapa key anak agar kompatibel dengan template renderUI kamu
-      children: [],
-      responList: [],
-      responL2: [],
-      items: []
+    const nodeData = {
+      id: id,
+      level: level,
+      owner: owner,
+      title: title,
+      parentId: parentId,
+      children: []
+    };
+
+    // Buat DOM element menggunakan fungsi asli aplikasi
+    const nodeElement = deserializeNode(nodeData);
+    
+    // Simpan ke map berdasarkan ID dan sertakan parentId-nya
+    nodeDOMMap[id] = {
+      element: nodeElement,
+      parentId: parentId
     };
   });
 
-  // 3. Hubungkan Child ke Parent
-  rawNodes.forEach(item => {
-    const currentNode = nodeMap[item.id];
-    if (item.parentId && nodeMap[item.parentId]) {
-      const parent = nodeMap[item.parentId];
-      // Masukkan ke seluruh array penampung anak yang mungkin dipakai oleh UI kamu
-      parent.children.push(currentNode);
-      parent.responList.push(currentNode);
-      if (parent.responL2) parent.responL2.push(currentNode);
-      if (parent.items) parent.items.push(currentNode);
+  // Langkah 2: Tempelkan ke Container atau Parent-nya masing-masing
+  Object.keys(nodeDOMMap).forEach(id => {
+    const item = nodeDOMMap[id];
+    const parentId = item.parentId;
+
+    // Jika tidak punya Parent ID, atau Parent ID-nya tidak ada di Excel, jadikan Root
+    if (!parentId || !nodeDOMMap[parentId]) {
+      container.appendChild(item.element);
     } else {
-      rootNodes.push(currentNode);
+      // Jika punya Parent ID, cari .children-container di dalam elemen Parent
+      const parentElement = nodeDOMMap[parentId].element;
+      
+      // Cari container anak (coba .children-container atau cari div anak di dalamnya)
+      let childrenContainer = parentElement.querySelector('.children-container');
+      
+      if (!childrenContainer) {
+        // Fallback jika class children-container ada di dalam elemen turunan tertentu
+        childrenContainer = parentElement.querySelector('[class*="children"]') || parentElement;
+      }
+
+      if (childrenContainer) {
+        childrenContainer.appendChild(item.element);
+      } else {
+        parentElement.appendChild(item.element);
+      }
     }
   });
 
-  // 4. Timpa data ke state global
-  if (typeof treeData !== 'undefined') {
-    treeData = rootNodes;
-  }
-  if (typeof appTreeData !== 'undefined') {
-    appTreeData = rootNodes;
-  }
-
-  // 5. Panggil fungsi render bawaan UI secara menyeluruh
-  if (typeof renderTree === 'function') {
-    renderTree();
-  } else if (typeof renderTreeBuilder === 'function') {
-    renderTreeBuilder();
-  } else if (typeof renderTreeUI === 'function') {
-    renderTreeUI();
-  }
-
-  // 6. Sinkronisasi Dropdown & Validasi
+  // Langkah 3: Jalankan sinkronisasi dropdown & validasi
   if (typeof populateParentDropdowns === 'function') populateParentDropdowns();
   if (typeof runValidation === 'function') runValidation();
 }
