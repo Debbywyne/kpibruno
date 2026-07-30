@@ -130,21 +130,59 @@ function buildTreeFromExcelData(rows) {
   const container = document.getElementById('treeContainer');
   if (!container) return;
 
-  container.innerHTML = ''; 
+  // Bersihkan isi tree container
+  container.innerHTML = '';
 
+  if (!rows || rows.length === 0) {
+    showDraftNotice("Data Excel kosong!");
+    return;
+  }
+
+  // Map untuk menyimpan Node DOM berdasarkan Kode KPI / Indeks
   const nodeDOMMap = {};
 
-  rows.forEach(row => {
-    // ... (kode pembacaan baris excel kamu) ...
-  });
+  try {
+    // 1. Render setiap elemen Tree dari data Excel
+    rows.forEach((row, index) => {
+      // Pastikan data baris valid
+      const id = row.id || `node-${index}`;
+      const name = row.name || row.kpi_name || row['Nama KPI'] || 'KPI Tanpa Nama';
+      const level = row.level || row['Level'] || 'L1';
+      const owner = row.owner || row['Unit Owner'] || '-';
+      const parentId = row.parentId || row.parent_id || row['Parent ID'] || null;
 
-  // ==========================================
-  // TAMBAHKAN SINKRONISASI INI DI PALING BAWAH
-  // ==========================================
-  if (typeof changeCluster === 'function') {
-    changeCluster(); // Memaksa pembaruan seluruh dropdown level & validasi sesuai kluster aktif
-  } else {
-    runValidation();
+      // Buat elemen visual node tree
+      const nodeCard = createTreeNodeDOM({ id, name, level, owner, parentId });
+
+      nodeDOMMap[id] = nodeCard;
+
+      // Jika punya parent, masukkan ke dalam anak parent-nya
+      if (parentId && nodeDOMMap[parentId]) {
+        let childContainer = nodeDOMMap[parentId].querySelector('.tree-children');
+        if (!childContainer) {
+          childContainer = document.createElement('div');
+          childContainer.className = 'tree-children ml-6 pl-4 border-l-2 border-teal-200 mt-2 space-y-2';
+          nodeDOMMap[parentId].appendChild(childContainer);
+        }
+        childContainer.appendChild(nodeCard);
+      } else {
+        // Jika Root / L1, masukkan langsung ke container utama
+        container.appendChild(nodeCard);
+      }
+    });
+
+    // 2. Jalankan validasi & sinkronisasi UI secara aman
+    if (typeof runValidation === 'function') {
+      runValidation();
+    }
+    
+    // Refresh dropdown parent untuk Halaman 2
+    if (typeof populateParentDropdowns === 'function') {
+      populateParentDropdowns();
+    }
+
+  } catch (err) {
+    console.error("Error saat merender Tree dari Excel:", err);
   }
 }
 // ==========================================
@@ -380,24 +418,28 @@ function switchTab(tabIndex) {
 }
 
 function changeCluster() {
-  // Update isi dropdown level di seluruh baris tabel yang ada
+  const clusterSelect = document.getElementById('clusterSelect');
+  if (!clusterSelect) return;
+
+  const activeCluster = clusterSelect.value;
+
+  // Update opsi level pada baris tabel Halaman 2 yang sudah ada
   const levelSelects = document.querySelectorAll('#kpiTableBody .kpi-level');
   levelSelects.forEach(select => {
-    const currentVal = select.value;
-    select.innerHTML = generateLevelOptions();
-
-    // Jika nilai sebelumnya masih valid (tidak disabled), pertahankan. Jika disabled, pilih nilai enabled pertama.
-    const currentOpt = Array.from(select.options).find(opt => opt.value === currentVal);
-    if (currentOpt && !currentOpt.disabled) {
-      select.value = currentVal;
-    } else {
-      const firstEnabled = Array.from(select.options).find(opt => !opt.disabled);
-      if (firstEnabled) select.value = firstEnabled.value;
+    if (typeof generateLevelOptions === 'function') {
+      const currentVal = select.value;
+      select.innerHTML = generateLevelOptions();
+      
+      // Kembalikan nilai jika masih valid
+      const hasOption = Array.from(select.options).some(opt => opt.value === currentVal && !opt.disabled);
+      if (hasOption) select.value = currentVal;
     }
   });
 
-  // Jalankan validasi ulang
-  runValidation();
+  // Jalankan ulang validasi aturan
+  if (typeof runValidation === 'function') {
+    runValidation();
+  }
 }
 function renderOwnerField(level) {
   if (level === 'L1') {
