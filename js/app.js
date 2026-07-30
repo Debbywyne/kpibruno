@@ -126,11 +126,14 @@ function handleExcelImport(event) {
 // ==========================================
 // 3. LOGIKA MEMBANGUN STRUKTUR TREE BERDASARKAN PARENT ID
 // ==========================================
+// Tambahkan variabel global ini di bagian atas file app.js (di luar fungsi manapun)
+let allTreeKPIs = [];
+
 function buildTreeFromExcelData(rows) {
   const container = document.getElementById('treeContainer');
   if (!container) return;
 
-  container.innerHTML = ''; // Restrukturasi ulang container
+  container.innerHTML = ''; 
 
   if (!rows || rows.length === 0) {
     alert("Data Excel kosong!");
@@ -138,8 +141,9 @@ function buildTreeFromExcelData(rows) {
   }
 
   const nodeDOMMap = {};
+  allTreeKPIs = []; // Reset penampung global
 
-  // Langkah 1: Buat semua node DOM menggunakan deserializeNode bawaan kamu
+  // 1. Proses baris Excel
   rows.forEach((row, index) => {
     const id = row['ID'] ? String(row['ID']).trim() : ('node-' + Date.now() + '-' + index);
     const level = row['Level'] ? String(row['Level']).toUpperCase().trim() : 'L1';
@@ -147,59 +151,51 @@ function buildTreeFromExcelData(rows) {
     const title = row['Nama KPI'] || '';
     const parentId = row['Parent ID'] ? String(row['Parent ID']).trim() : null;
 
-    const nodeData = {
-      id: id,
-      level: level,
-      owner: owner,
-      title: title,
-      parentId: parentId,
-      children: []
-    };
+    // Simpan ke array global untuk dropdown form
+    allTreeKPIs.push({ id, level, title, owner });
 
-    // Buat DOM element menggunakan fungsi asli aplikasi
+    const nodeData = { id, level, owner, title, parentId, children: [] };
     const nodeElement = deserializeNode(nodeData);
     
-    // Simpan ke map berdasarkan ID dan sertakan parentId-nya
-    nodeDOMMap[id] = {
-      element: nodeElement,
-      parentId: parentId
-    };
+    nodeDOMMap[id] = { element: nodeElement, parentId: parentId };
   });
 
-  // Langkah 2: Tempelkan ke Container atau Parent-nya masing-masing
+  // 2. Render ke DOM Tree
   Object.keys(nodeDOMMap).forEach(id => {
     const item = nodeDOMMap[id];
-    const parentId = item.parentId;
-
-    // Jika tidak punya Parent ID, atau Parent ID-nya tidak ada di Excel, jadikan Root
-    if (!parentId || !nodeDOMMap[parentId]) {
+    if (!item.parentId || !nodeDOMMap[item.parentId]) {
       container.appendChild(item.element);
     } else {
-      // Jika punya Parent ID, cari .children-container di dalam elemen Parent
-      const parentElement = nodeDOMMap[parentId].element;
-      
-      // Cari container anak (coba .children-container atau cari div anak di dalamnya)
-      let childrenContainer = parentElement.querySelector('.children-container');
-      
-      if (!childrenContainer) {
-        // Fallback jika class children-container ada di dalam elemen turunan tertentu
-        childrenContainer = parentElement.querySelector('[class*="children"]') || parentElement;
-      }
-
-      if (childrenContainer) {
-        childrenContainer.appendChild(item.element);
-      } else {
-        parentElement.appendChild(item.element);
-      }
+      const parentElement = nodeDOMMap[item.parentId].element;
+      let childrenContainer = parentElement.querySelector('.children-container') || parentElement.querySelector('[class*="children"]') || parentElement;
+      childrenContainer.appendChild(item.element);
     }
   });
 
-  
-  // Langkah 3: Jalankan sinkronisasi dropdown & validasi dengan sedikit jeda (delay)
+  // 3. Paksa isi dropdown Form Halaman 2 langsung dari data `allTreeKPIs`
   setTimeout(() => {
-    if (typeof populateParentDropdowns === 'function') populateParentDropdowns();
+    populateParentDropdownsDirectly();
     if (typeof runValidation === 'function') runValidation();
-  }, 100); // Beri waktu 100ms agar DOM ter-render sempurna
+  }, 100);
+}
+
+// Fungsi khusus pengisi dropdown langsung dari data master
+function populateParentDropdownsDirectly() {
+  const parentSelects = document.querySelectorAll('#kpiTableBody .kpi-parent, .parent-select');
+
+  parentSelects.forEach(select => {
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">-- Pilih Induk --</option>';
+
+    allTreeKPIs.forEach(opt => {
+      const optionElement = document.createElement('option');
+      optionElement.value = opt.id;
+      optionElement.textContent = `[${opt.level}] ${opt.title} (${opt.owner})`;
+      select.appendChild(optionElement);
+    });
+
+    if (currentValue) select.value = currentValue;
+  });
 }
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
