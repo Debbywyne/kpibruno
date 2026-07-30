@@ -401,24 +401,25 @@ function switchTab(tabIndex) {
 }
 
 function changeCluster() {
-  const clusterSelect = document.getElementById('clusterSelect');
-  if (!clusterSelect) return;
+  // Update isi dropdown level di seluruh baris tabel yang ada
+  const levelSelects = document.querySelectorAll('#kpiTableBody .kpi-level');
+  levelSelects.forEach(select => {
+    const currentVal = select.value;
+    select.innerHTML = generateLevelOptions();
 
-  const currentCluster = clusterSelect.value;
-  console.log("Kluster aktif diubah ke:", currentCluster);
+    // Jika nilai sebelumnya masih valid (tidak disabled), pertahankan. Jika disabled, pilih nilai enabled pertama.
+    const currentOpt = Array.from(select.options).find(opt => opt.value === currentVal);
+    if (currentOpt && !currentOpt.disabled) {
+      select.value = currentVal;
+    } else {
+      const firstEnabled = Array.from(select.options).find(opt => !opt.disabled);
+      if (firstEnabled) select.value = firstEnabled.value;
+    }
+  });
 
-  // 1. Simpan kluster aktif ke localStorage/state (opsional)
-  localStorage.setItem('selectedCluster', currentCluster);
-
-  // 2. Jalankan ulang validasi agar kotak status langsung berubah sesuai aturan kluster baru
-  if (typeof runValidation === 'function') {
-    runValidation();
-  }
-
-  // 3. Tampilkan notifikasi singkat
-  showDraftNotice(`Kluster berhasil diubah ke ${currentCluster}`);
+  // Jalankan validasi ulang
+  runValidation();
 }
-
 function renderOwnerField(level) {
   if (level === 'L1') {
     return `<input type="text" readonly value="ADHI" class="node-owner w-32 glass-input text-gray-700 rounded-lg px-2.5 py-1 text-xs font-bold">`;
@@ -511,52 +512,56 @@ function removeTreeNode(nodeId) {
 // FORM TABEL DETAIL (HALAMAN 2)
 // ==========================================
 
-function addKPIRow() {
+function addKPIRow(data = {}) {
   const tbody = document.getElementById('kpiTableBody');
   if (!tbody) return;
 
-  const rowId = 'kpi-' + Date.now();
   const tr = document.createElement('tr');
-  tr.id = rowId;
-  tr.className = "hover:bg-white/40 transition-colors";
+  tr.className = "border-b border-gray-100 hover:bg-slate-50/50 transition";
 
   tr.innerHTML = `
-    <td class="p-2 border-b border-white/40">
-      <select class="w-full glass-input rounded-lg p-1.5 text-xs font-bold kpi-level" onchange="onLevelSelectChange(this)">
-        <option value="L1">L1</option>
-        <option value="L2">L2</option>
-        <option value="L3">L3</option>
-        <option value="L4">L4</option>
-        <option value="L5">L5</option>
+    <td class="p-2">
+      <select class="kpi-level glass-input text-xs font-semibold text-slate-700 rounded-lg p-1.5 w-full" onchange="runValidation()">
+        ${generateLevelOptions()}
       </select>
     </td>
-    <td class="p-2 border-b border-white/40">
-      <select class="w-full glass-input rounded-lg p-1.5 text-xs font-medium kpi-parent-select" onchange="onParentSelectChange(this)">
-        <option value="">-- Tanpa Induk --</option>
+    <td class="p-2">
+      <select class="kpi-parent glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full">
+        <option value="">-- Pilih Induk --</option>
       </select>
     </td>
-    <td class="p-2 border-b border-white/40">
-      <select class="w-full glass-input rounded-lg p-1.5 text-xs font-bold text-teal-900 kpi-owner-select" onchange="onOwnerSelectChange(this)">
+    <td class="p-2">
+      <select class="kpi-owner glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full">
         <option value="">-- Pilih Owner --</option>
       </select>
     </td>
-    <td class="p-2 border-b border-white/40">
-      <select class="w-full glass-input rounded-lg p-1.5 text-xs font-medium kpi-child-select" disabled>
+    <td class="p-2">
+      <select class="kpi-respon glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full">
         <option value="">-- Pilih Respon KPI --</option>
       </select>
     </td>
-    <td class="p-2 border-b border-white/40">
-      <input type="text" class="w-full glass-input rounded-lg p-1.5 text-xs font-medium kpi-target" placeholder="Target...">
+    <td class="p-2">
+      <input type="text" class="kpi-target glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full" placeholder="Target...">
     </td>
-    <td class="p-2 border-b border-white/40">
-      <input type="number" min="0" max="100" class="w-full glass-input rounded-lg p-1.5 text-xs font-bold text-center kpi-bobot" value="0" oninput="runValidation()">
+    <td class="p-2">
+      <input type="number" class="kpi-bobot glass-input text-xs font-bold text-teal-900 rounded-lg p-1.5 w-20 text-center" value="${data.bobot || 0}" min="0" max="100" onchange="runValidation()" onkeyup="runValidation()">
     </td>
-    <td class="p-2 border-b border-white/40 text-center">
-      <button type="button" onclick="removeRow('${rowId}'); runValidation();" class="text-rose-600 hover:text-rose-800 transition-colors"><i class="fa-solid fa-trash"></i></button>
+    <td class="p-2 text-center">
+      <button onclick="deleteRow(this)" class="text-rose-500 hover:text-rose-700 p-1">
+        <i class="fa-solid fa-trash"></i>
+      </button>
     </td>
   `;
+
   tbody.appendChild(tr);
-  updateKPIRowRules(tr);
+
+  // Otomatis pilih level default pertama yang tidak disabled
+  const levelSelect = tr.querySelector('.kpi-level');
+  if (levelSelect) {
+    const firstEnabled = Array.from(levelSelect.options).find(opt => !opt.disabled);
+    if (firstEnabled) levelSelect.value = firstEnabled.value;
+  }
+
   runValidation();
 }
 
@@ -983,4 +988,28 @@ function buildNodeTreeHTML(node) {
       ${childrenHTML}
     </div>
   `;
+}
+// Fungsi untuk merender opsi dropdown Level berdasarkan Kluster Aktif
+function generateLevelOptions() {
+  const clusterSelect = document.getElementById('clusterSelect');
+  const activeCluster = clusterSelect ? clusterSelect.value : 'BOD-3';
+  const rules = KPI_RULES[activeCluster];
+
+  if (!rules) return '';
+
+  const levels = ['L1', 'L2', 'L3', 'L4', 'L5'];
+  let optionsHTML = '';
+
+  levels.forEach(level => {
+    const rule = rules[level];
+    if (rule.min === 0 && rule.max === 0) {
+      // Jika diblokir (0%), beri label (Disabled) dan atur atribut disabled
+      optionsHTML += `<option value="${level}" disabled>${level} (Disabled)</option>`;
+    } else {
+      // Tampilkan rentang min - max yang sesuai matriks
+      optionsHTML += `<option value="${level}">${level} (${rule.min}% - ${rule.max}%)</option>`;
+    }
+  });
+
+  return optionsHTML;
 }
