@@ -194,9 +194,12 @@ function buildTreeFromExcelData(rows) {
     }
   });
 
-  // Langkah 3: Jalankan sinkronisasi dropdown & validasi
-  if (typeof populateParentDropdowns === 'function') populateParentDropdowns();
-  if (typeof runValidation === 'function') runValidation();
+  
+  // Langkah 3: Jalankan sinkronisasi dropdown & validasi dengan sedikit jeda (delay)
+  setTimeout(() => {
+    if (typeof populateParentDropdowns === 'function') populateParentDropdowns();
+    if (typeof runValidation === 'function') runValidation();
+  }, 100); // Beri waktu 100ms agar DOM ter-render sempurna
 }
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
@@ -638,38 +641,57 @@ function onLevelSelectChange(selectElem) {
   runValidation();
 }
 
-function populateParentDropdown(tr) {
-  const selectedLevel = tr.querySelector('.kpi-level').value;
-  const parentSelect = tr.querySelector('.kpi-parent-select');
-  if (!parentSelect) return;
+function populateParentDropdowns() {
+  const container = document.getElementById('treeContainer');
+  if (!container) return;
 
-  const parentLevelMap = { 'L1': null, 'L2': 'L1', 'L3': 'L2', 'L4': 'L3', 'L5': 'L4' };
-  const parentLevel = parentLevelMap[selectedLevel];
+  // 1. Kumpulkan semua node KPI yang ada di Halaman 1 (Visual Tree)
+  // Mencari elemen berdasarkan class node / dataset / id
+  const allNodes = container.querySelectorAll('.tree-node, [data-id], .kpi-card, div[id^="node-"]');
+  const parentOptions = [];
 
-  parentSelect.innerHTML = '';
+  allNodes.forEach(node => {
+    // Ambil ID Node
+    const id = node.dataset.id || node.getAttribute('data-id') || node.id;
+    
+    // Ambil Level KPI (L1, L2, L3, dll.)
+    const levelElement = node.querySelector('.kpi-level, .node-level, [class*="level"]') || node;
+    let level = node.dataset.level || node.getAttribute('data-level') || levelElement.innerText || '';
+    level = level.match(/L[1-5]/i) ? level.match(/L[1-5]/i)[0].toUpperCase() : '';
 
-  if (!parentLevel) {
-    parentSelect.innerHTML = `<option value="">-- Tanpa Induk (L1) --</option>`;
-    parentSelect.disabled = true;
-    populateOwnerDropdown(tr);
-  } else {
-    parentSelect.disabled = false;
-    parentSelect.innerHTML = `<option value="">-- Pilih Induk ${parentLevel} --</option>`;
+    // Ambil Nama/Judul KPI
+    const titleElement = node.querySelector('input, .kpi-title, .node-title, strong, h4') || node;
+    let title = node.dataset.title || node.getAttribute('data-title') || titleElement.value || titleElement.innerText || '';
+    title = title.replace(/^(L[1-5])\s*/i, '').trim(); // Bersihkan prefix level jika ada
 
-    const parentNodes = document.querySelectorAll(`#treeContainer [data-level="${parentLevel}"]`);
-    parentNodes.forEach(node => {
-      const titleInput = node.querySelector('.node-title');
-      const titleVal = titleInput ? titleInput.value.trim() : '';
-      if (titleVal) {
-        const opt = document.createElement('option');
-        opt.value = node.id;
-        opt.textContent = `[${parentLevel}] ${titleVal}`;
-        parentSelect.appendChild(opt);
-      }
+    // Jika ID dan Title valid, simpan ke daftar opsi
+    if (id && title && title !== '-- Pilih Induk --') {
+      parentOptions.push({ id, level, title });
+    }
+  });
+
+  // 2. Refresh seluruh Dropdown "KPI Induk (Parent)" di Halaman 2 (Form Detail KPI)
+  const parentSelects = document.querySelectorAll('#kpiTableBody .kpi-parent, .parent-select');
+
+  parentSelects.forEach(select => {
+    const currentValue = select.value; // Simpan nilai yang sedang terpilih (jika ada)
+
+    // Reset isi dropdown
+    select.innerHTML = '<option value="">-- Pilih Induk --</option>';
+
+    // Masukkan opsi node yang berhasil dikumpulkan
+    parentOptions.forEach(opt => {
+      const optionElement = document.createElement('option');
+      optionElement.value = opt.id;
+      optionElement.textContent = opt.level ? `[${opt.level}] ${opt.title}` : opt.title;
+      select.appendChild(optionElement);
     });
 
-    populateOwnerDropdown(tr);
-  }
+    // Kembalikan opsi terpilih jika nilainya masih ada di daftar baru
+    if (currentValue && Array.from(select.options).some(o => o.value === currentValue)) {
+      select.value = currentValue;
+    }
+  });
 }
 
 function onParentSelectChange(selectElem) {
