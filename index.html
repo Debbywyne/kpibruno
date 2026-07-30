@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KPI Cascading System</title>
+  <title>Sistem Cascading & Pengisian KPI</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,29 +21,35 @@
 <body class="bg-gradient-to-br from-teal-50 via-teal-100 to-amber-50 min-h-screen p-4 md:p-8 font-sans">
 
   <div class="max-w-7xl mx-auto">
-    <!-- HEADER UTAMA & NAVIGASI TAB -->
+    <!-- HEADER UTAMA -->
     <header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h1 class="text-2xl font-black text-teal-900 tracking-tight">KPI Cascading System</h1>
-        <p class="text-xs font-semibold text-teal-800">Pemetaan Struktur Respon KPI & Pengisian Form Kluster</p>
+      <div class="flex items-center gap-3">
+        <div class="text-amber-400 text-3xl">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black text-teal-900 tracking-tight">Sistem Cascading & Pengisian KPI</h1>
+          <p class="text-xs font-semibold text-teal-800/80">Pemetaan Tree KPI, Form Pengisian, dan Visualisasi Liquid Glass</p>
+        </div>
       </div>
 
+      <!-- KANAN HEADER: KLUSTER & DRAFT BUTTONS -->
       <div class="flex flex-wrap items-center gap-3">
         <!-- Pemilih Kluster -->
-        <div class="flex items-center gap-2 glass-card px-3 py-1.5 rounded-xl border border-white">
-          <label for="clusterSelect" class="text-xs font-bold text-teal-900">Kluster:</label>
-          <select id="clusterSelect" onchange="changeCluster()" class="glass-input text-xs font-bold text-teal-900 rounded-lg px-2 py-1 border-none focus:ring-0">
+        <div class="flex items-center gap-2 glass-card px-3 py-2 rounded-xl border border-white/80 shadow-sm">
+          <label for="clusterSelect" class="text-xs font-black text-teal-900 uppercase tracking-wider">KLUSTER JABATAN:</label>
+          <select id="clusterSelect" onchange="changeCluster()" class="glass-input text-xs font-bold text-teal-900 rounded-lg px-2 py-1 border-none focus:ring-0 cursor-pointer">
             <option value="BOD-2">BOD-2</option>
             <option value="BOD-3">BOD-3</option>
             <option value="BOD-4">BOD-4</option>
           </select>
         </div>
 
-        <!-- Tombol Save/Load Draft Global -->
-        <button onclick="saveDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
+        <!-- Tombol Save/Load Draft -->
+        <button onclick="saveDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
           <i class="fa-solid fa-floppy-disk"></i> Simpan Draft
         </button>
-        <button onclick="loadDraft()" class="bg-teal-700 hover:bg-teal-800 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
+        <button onclick="loadDraft()" class="bg-teal-700 hover:bg-teal-800 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
           <i class="fa-solid fa-folder-open"></i> Muat Draft
         </button>
       </div>
@@ -59,15 +65,15 @@
     <nav class="flex overflow-x-auto gap-2 p-1.5 bg-white/40 backdrop-blur-md rounded-2xl mb-6 border border-white/60 shadow-sm">
       <button id="tabBtn1" onclick="switchTab(1)" class="py-3 px-6 font-bold rounded-xl text-teal-900 bg-white/90 shadow-md flex items-center gap-2 whitespace-nowrap transition-all border border-white">
         <span class="bg-palette-teal text-white rounded-lg w-6 h-6 text-xs flex items-center justify-center font-black">1</span>
-        Pemetaan Respon KPI
+        Pemetaan Tree KPI (Cascading)
       </button>
       <button id="tabBtn2" onclick="switchTab(2)" class="py-3 px-6 font-semibold rounded-xl text-teal-900/70 hover:bg-white/40 flex items-center gap-2 whitespace-nowrap transition-all">
         <span class="bg-teal-900/20 text-teal-900 rounded-lg w-6 h-6 text-xs flex items-center justify-center font-bold">2</span>
-        Form Detail KPI
+        Form Pengisian Detail KPI
       </button>
       <button id="tabBtn3" onclick="switchTab(3)" class="py-3 px-6 font-semibold rounded-xl text-teal-900/70 hover:bg-white/40 flex items-center gap-2 whitespace-nowrap transition-all">
         <span class="bg-teal-900/20 text-teal-900 rounded-lg w-6 h-6 text-xs flex items-center justify-center font-bold">3</span>
-        Visualisasi Hierarki
+        Visualisasi Tree Chart
       </button>
     </nav>
 
@@ -76,12 +82,12 @@
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h2 class="text-xl font-bold text-teal-900 flex items-center gap-2">
-            <i class="fa-solid fa-sitemap text-palette-teal"></i> Pohon Pemetaan Respon KPI (L1 - L5)
+            <i class="fa-solid fa-sitemap text-palette-coral"></i> Visual Tree Builder (L1 - L5)
           </h2>
-          <p class="text-xs text-teal-800 font-medium">Buat struktur cascaded KPI dari Korporasi (L1) hingga ke Biro/Fungsi (L5).</p>
+          <p class="text-xs text-teal-800 font-medium">Susun hierarki KPI beserta Unit Owner secara bertingkat.</p>
         </div>
-        <button onclick="addL1Root()" class="btn-teal text-xs px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
-          <i class="fa-solid fa-plus-circle"></i> Tambah KPI L1 (Akar)
+        <button onclick="addL1Root()" class="btn-teal text-xs px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-2">
+          <i class="fa-solid fa-circle-plus"></i> Tambah KPI Utama (L1)
         </button>
       </div>
 
@@ -155,11 +161,11 @@
       </div>
     </section>
 
-    <!-- HALAMAN 3: VISUALISASI HIERARKI TREE INTERAKTIF -->
+    <!-- HALAMAN 3: VISUALISASI TREE CHART -->
     <section id="page3" class="hidden glass-card rounded-2xl p-6 shadow-xl">
       <div class="mb-6">
         <h2 class="text-xl font-bold text-teal-900 flex items-center gap-2">
-          <i class="fa-solid fa-diagram-project text-palette-teal"></i> Visualisasi Cascading Tree
+          <i class="fa-solid fa-diagram-project text-palette-teal"></i> Visualisasi Tree Chart
         </h2>
         <p class="text-xs text-teal-800 font-medium">Bagan interaktif hubungan keterkaitan KPI L1 hingga L5 yang telah kamu bangun pada Halaman 1.</p>
       </div>
