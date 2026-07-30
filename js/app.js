@@ -402,11 +402,21 @@ function switchTab(tabIndex) {
 
 function changeCluster() {
   const clusterSelect = document.getElementById('clusterSelect');
-  if (clusterSelect) {
-    currentCluster = clusterSelect.value;
+  if (!clusterSelect) return;
+
+  const currentCluster = clusterSelect.value;
+  console.log("Kluster aktif diubah ke:", currentCluster);
+
+  // 1. Simpan kluster aktif ke localStorage/state (opsional)
+  localStorage.setItem('selectedCluster', currentCluster);
+
+  // 2. Jalankan ulang validasi agar kotak status langsung berubah sesuai aturan kluster baru
+  if (typeof runValidation === 'function') {
+    runValidation();
   }
-  updateAllKPIRowsRules();
-  runValidation();
+
+  // 3. Tampilkan notifikasi singkat
+  showDraftNotice(`Kluster berhasil diubah ke ${currentCluster}`);
 }
 
 function renderOwnerField(level) {
@@ -719,70 +729,66 @@ function removeRow(id) {
 function runValidation() {
   const clusterSelect = document.getElementById('clusterSelect');
   const activeCluster = clusterSelect ? clusterSelect.value : 'BOD-3';
-  const rule = getActiveClusterRule(activeCluster);
 
+  // 1. Ambil semua data baris dari tabel Halaman 2
   const rows = document.querySelectorAll('#kpiTableBody tr');
-  const itemCount = rows.length;
+  const items = [];
 
-  let totalBobot = 0;
   rows.forEach(row => {
+    const levelSelect = row.querySelector('.kpi-level');
     const bobotInput = row.querySelector('.kpi-bobot');
-    if (bobotInput) {
-      totalBobot += parseFloat(bobotInput.value) || 0;
+
+    if (levelSelect && bobotInput) {
+      items.push({
+        jenis: levelSelect.value,
+        bobot: parseFloat(bobotInput.value) || 0
+      });
     }
   });
 
-  // Update UI Counter
+  // 2. Jalankan fungsi validasi dari rules.js
+  const result = validateKPI(activeCluster, items);
+
+  // 3. Hitung Item Non-L1/L2 (L3, L4, L5) & Total Bobot untuk UI Counter
+  const itemsNonL1L2 = items.filter(item => ['L3', 'L4', 'L5'].includes(item.jenis));
+  const totalBobot = items.reduce((sum, item) => sum + (parseFloat(item.bobot) || 0), 0);
+
+  // 4. Update Angka di UI Counter Sidebar
   const itemCounter = document.getElementById('itemCounter');
   if (itemCounter) {
-    itemCounter.textContent = `${itemCount} / (${rule.minItems} - ${rule.maxItems} Item)`;
+    itemCounter.textContent = `${itemsNonL1L2.length} / Max 15 Item (L3-L5)`;
   }
 
   const bobotCounter = document.getElementById('bobotCounter');
   if (bobotCounter) {
-    bobotCounter.textContent = `${totalBobot}% / ${rule.targetBobot}%`;
+    bobotCounter.textContent = `${totalBobot}% / 100%`;
   }
 
-  // Generate Pesan Validasi
+  // 5. Tampilkan Pesan Hasil Validasi di UI
   const validationBox = document.getElementById('validationBox');
   const pdfBtn = document.getElementById('pdfBtn');
 
   if (!validationBox) return;
 
   validationBox.innerHTML = '';
-  let isValid = true;
 
-  // 1. Cek Jumlah Item
-  if (itemCount < rule.minItems || itemCount > rule.maxItems) {
-    isValid = false;
-    validationBox.innerHTML += `
-      <li class="text-rose-600 flex items-center gap-1.5 font-semibold">
-        <i class="fa-solid fa-triangle-exclamation"></i> Jumlah item (${itemCount}) harus antara ${rule.minItems} - ${rule.maxItems} item untuk ${activeCluster}.
+  if (result.isValid) {
+    validationBox.innerHTML = `
+      <li class="text-emerald-700 flex items-center gap-1.5 font-semibold">
+        <i class="fa-solid fa-circle-check"></i> Semua kriteria KPI kluster ${activeCluster} terpenuhi!
       </li>`;
   } else {
-    validationBox.innerHTML += `
-      <li class="text-emerald-700 flex items-center gap-1.5 font-semibold">
-        <i class="fa-solid fa-circle-check"></i> Jumlah item KPI sudah memenuhi kriteria (${itemCount} item).
-      </li>`;
+    result.errors.forEach(err => {
+      validationBox.innerHTML += `
+        <li class="text-rose-600 flex items-center gap-1.5 font-semibold">
+          <i class="fa-solid fa-triangle-exclamation"></i> ${err}
+        </li>`;
+    });
   }
 
-  // 2. Cek Total Bobot
-  if (totalBobot !== rule.targetBobot) {
-    isValid = false;
-    validationBox.innerHTML += `
-      <li class="text-rose-600 flex items-center gap-1.5 font-semibold">
-        <i class="fa-solid fa-triangle-exclamation"></i> Total bobot harus persis ${rule.targetBobot}% (Saat ini: ${totalBobot}%).
-      </li>`;
-  } else {
-    validationBox.innerHTML += `
-      <li class="text-emerald-700 flex items-center gap-1.5 font-semibold">
-        <i class="fa-solid fa-circle-check"></i> Total bobot sudah 100%.
-      </li>`;
-  }
-
-  // Enable / Disable Tombol PDF berdasarkan validasi
+  // 6. Kunci/Buka Tombol PDF berdasarkan status validasi
   if (pdfBtn) {
-    pdfBtn.disabled = !isValid;
+    pdfBtn.disabled = !result.isValid;
   }
 }
 
