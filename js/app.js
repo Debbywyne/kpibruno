@@ -452,8 +452,15 @@ function serializeForm() {
 // NAVIGASI TAB & ATURAN
 // ==========================================
 
+// Variable Global untuk menyimpan Chart instance agar tidak me-render ulang menumpuk
+let doughnutChartInstance = null;
+let barChartInstance = null;
+
+// ==========================================
+// UPDATE NAVIGASI TAB UNTUK MENDUKUNG TAB 4
+// ==========================================
 function switchTab(tabIndex) {
-  [1, 2, 3].forEach(i => {
+  [1, 2, 3, 4].forEach(i => {
     const btn = document.getElementById(`tabBtn${i}`);
     const page = document.getElementById(`page${i}`);
     if (i === tabIndex) {
@@ -479,7 +486,147 @@ function switchTab(tabIndex) {
     runValidation();
   } else if (tabIndex === 3) {
     renderInteractiveTree();
+  } else if (tabIndex === 4) {
+    renderSummaryPage(); // Eksekusi pembuatan chart saat Tab 4 diklik
   }
+}
+
+// ==========================================
+// FUNGSI RENDER DASHBOARD & CHART (PAGE 4)
+// ==========================================
+function renderSummaryPage() {
+  const rows = document.querySelectorAll('#kpiTableBody tr');
+  const labels = [];
+  const weights = [];
+  const colors = [
+    '#249d8f', '#e76f51', '#e9c46a', '#2a9d8f', '#f4a261',
+    '#9b5de5', '#f15bb5', '#00bbf9', '#00f5d4', '#415a77'
+  ];
+
+  let maxWeight = -1;
+  let minWeight = Infinity;
+  let maxLabel = '-';
+  let minLabel = '-';
+
+  rows.forEach((tr, index) => {
+    const responSelect = tr.querySelector('.kpi-respon') || tr.querySelector('.kpi-child-select');
+    const bobotInput = tr.querySelector('.kpi-bobot');
+
+    let title = 'Item #' + (index + 1);
+    if (responSelect && responSelect.selectedIndex > 0) {
+      title = responSelect.options[responSelect.selectedIndex].text;
+    }
+
+    const weight = parseFloat(bobotInput ? bobotInput.value : 0) || 0;
+
+    labels.push(title);
+    weights.push(weight);
+
+    // Hitung Min dan Max
+    if (weight > maxWeight) {
+      maxWeight = weight;
+      maxLabel = `${title} (${weight}%)`;
+    }
+    if (weight < minWeight && weight > 0) {
+      minWeight = weight;
+      minLabel = `${title} (${weight}%)`;
+    }
+  });
+
+  // Tampilkan statistik pada Card Ringkasan
+  const summaryTotalItem = document.getElementById('summaryTotalItem');
+  const summaryMaxBobot = document.getElementById('summaryMaxBobot');
+  const summaryMinBobot = document.getElementById('summaryMinBobot');
+
+  if (summaryTotalItem) summaryTotalItem.textContent = `${rows.length} Item`;
+  if (summaryMaxBobot) summaryMaxBobot.textContent = maxWeight > -1 ? maxLabel : '-';
+  if (summaryMinBobot) summaryMinBobot.textContent = minWeight !== Infinity ? minLabel : '-';
+
+  // Render Grafik Doughnut & Bar Chart
+  renderDoughnutChart(labels, weights, colors);
+  renderBarChart(labels, weights, colors);
+}
+
+function renderDoughnutChart(labels, data, colors) {
+  const ctx = document.getElementById('kpiDoughnutChart');
+  if (!ctx) return;
+
+  if (doughnutChartInstance) {
+    doughnutChartInstance.destroy();
+  }
+
+  doughnutChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: colors.slice(0, data.length),
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` Bobot: ${context.raw}%`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderBarChart(labels, data, colors) {
+  const ctx = document.getElementById('kpiBarChart');
+  if (!ctx) return;
+
+  if (barChartInstance) {
+    barChartInstance.destroy();
+  }
+
+  barChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Bobot KPI (%)',
+        data: data,
+        backgroundColor: colors.slice(0, data.length),
+        borderRadius: 8
+      }]
+    },
+    options: {
+      indexAxis: 'y', // Mengubah menjadi horizontal bar
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` Bobot: ${context.raw}%`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(value) { return value + '%'; }
+          }
+        }
+      }
+    }
+  });
 }
 
 function changeCluster() {

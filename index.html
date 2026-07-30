@@ -15,6 +15,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+  <!-- Chart.js CDN (DITAMBAHKAN UNTUK PAGE 4) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <!-- Custom Styles CSS -->
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -35,19 +38,17 @@
 
       <!-- KANAN HEADER: KLUSTER & DRAFT BUTTONS -->
       <div class="flex flex-wrap items-center gap-3">
-        <!-- Pemilih Kluster -->
         <div class="flex items-center gap-2 glass-card px-3 py-2 rounded-xl border border-white/80 shadow-sm">
           <label for="clusterSelect" class="text-xs font-black text-teal-900 uppercase tracking-wider">KLUSTER JABATAN:</label>
           <select id="clusterSelect" onchange="changeCluster()" class="glass-input text-xs font-bold text-teal-900 rounded-lg px-2 py-1 border-none focus:ring-0 cursor-pointer">
-  <option value="BOD-1">BOD-1</option>
-  <option value="BOD-2">BOD-2</option>
-  <option value="BOD-3" selected>BOD-3</option>
-  <option value="BOD-4">BOD-4</option>
-  <option value="BOD-5">BOD-5</option>
-</select>
+            <option value="BOD-1">BOD-1</option>
+            <option value="BOD-2">BOD-2</option>
+            <option value="BOD-3" selected>BOD-3</option>
+            <option value="BOD-4">BOD-4</option>
+            <option value="BOD-5">BOD-5</option>
+          </select>
         </div>
 
-        <!-- Tombol Save/Load Draft -->
         <button onclick="saveDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
           <i class="fa-solid fa-floppy-disk"></i> Simpan Draft
         </button>
@@ -63,7 +64,7 @@
       <button onclick="document.getElementById('draftNotice').classList.add('hidden')" class="text-teal-900 hover:text-teal-700"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
-    <!-- TAB NAVIGATION BAR -->
+    <!-- TAB NAVIGATION BAR (DITAMBAHKAN TAB 4) -->
     <nav class="flex overflow-x-auto gap-2 p-1.5 bg-white/40 backdrop-blur-md rounded-2xl mb-6 border border-white/60 shadow-sm">
       <button id="tabBtn1" onclick="switchTab(1)" class="py-3 px-6 font-bold rounded-xl text-teal-900 bg-white/90 shadow-md flex items-center gap-2 whitespace-nowrap transition-all border border-white">
         <span class="bg-palette-teal text-white rounded-lg w-6 h-6 text-xs flex items-center justify-center font-black">1</span>
@@ -77,25 +78,26 @@
         <span class="bg-teal-900/20 text-teal-900 rounded-lg w-6 h-6 text-xs flex items-center justify-center font-bold">3</span>
         Visualisasi Tree Chart
       </button>
+      <button id="tabBtn4" onclick="switchTab(4)" class="py-3 px-6 font-semibold rounded-xl text-teal-900/70 hover:bg-white/40 flex items-center gap-2 whitespace-nowrap transition-all">
+        <span class="bg-teal-900/20 text-teal-900 rounded-lg w-6 h-6 text-xs flex items-center justify-center font-bold">4</span>
+        Summary & Chart Bobot
+      </button>
     </nav>
 
-    <!-- HALAMAN 1: TREE BUILDER PEMETAAN KPI -->
+    <!-- HALAMAN 1 -->
     <section id="page1" class="glass-card rounded-2xl p-6 shadow-xl mb-6">
-        <!-- Input File Tersembunyi untuk Upload -->
-<input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelImport(event)">
+      <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelImport(event)">
 
-<div class="flex items-center gap-2">
-  <!-- Tombol Download Template Excel -->
-  <button onclick="downloadExcelTemplate()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
-    <i class="fa-solid fa-file-arrow-down"></i> Unduh Template Excel
-  </button>
+      <div class="flex items-center gap-2">
+        <button onclick="downloadExcelTemplate()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
+          <i class="fa-solid fa-file-arrow-down"></i> Unduh Template Excel
+        </button>
+        <button onclick="document.getElementById('excelFileInput').click()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
+          <i class="fa-solid fa-file-import"></i> Import Excel ke Tree
+        </button>
+      </div>
 
-  <!-- Tombol Import Excel -->
-  <button onclick="document.getElementById('excelFileInput').click()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
-    <i class="fa-solid fa-file-import"></i> Import Excel ke Tree
-  </button>
-</div>
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 mt-4">
         <div>
           <h2 class="text-xl font-bold text-teal-900 flex items-center gap-2">
             <i class="fa-solid fa-sitemap text-palette-coral"></i> Visual Tree Builder (L1 - L5)
@@ -110,7 +112,7 @@
       <div id="treeContainer" class="space-y-4"></div>
     </section>
 
-    <!-- HALAMAN 2: FORM PENGISIAN DETAIL KPI -->
+    <!-- HALAMAN 2 -->
     <section id="page2" class="hidden grid grid-cols-1 lg:grid-cols-4 gap-6">
       <div class="lg:col-span-3 glass-card rounded-2xl p-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -177,7 +179,7 @@
       </div>
     </section>
 
-    <!-- HALAMAN 3: VISUALISASI TREE CHART -->
+    <!-- HALAMAN 3 -->
     <section id="page3" class="hidden glass-card rounded-2xl p-6 shadow-xl">
       <div class="mb-6">
         <h2 class="text-xl font-bold text-teal-900 flex items-center gap-2">
@@ -188,6 +190,48 @@
 
       <div class="overflow-x-auto p-4 rounded-xl bg-white/30 border border-white/60">
         <div id="tree_chart_container"></div>
+      </div>
+    </section>
+
+    <!-- HALAMAN 4: SUMMARY & ANALISIS BOBOT CHART (BARU DITAMBAHKAN) -->
+    <section id="page4" class="hidden space-y-6">
+      <!-- Card Statistik Ringkas -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-teal-600 shadow-sm bg-white/70">
+          <p class="text-xs text-gray-500 font-semibold uppercase">Total Item KPI Diisi</p>
+          <h3 id="summaryTotalItem" class="text-2xl font-black text-teal-900 mt-1">0 Item</h3>
+        </div>
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-amber-500 shadow-sm bg-white/70">
+          <p class="text-xs text-gray-500 font-semibold uppercase">Bobot Terbesar</p>
+          <h3 id="summaryMaxBobot" class="text-sm font-bold text-teal-900 mt-1 truncate">-</h3>
+        </div>
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-rose-500 shadow-sm bg-white/70">
+          <p class="text-xs text-gray-500 font-semibold uppercase">Bobot Terkecil</p>
+          <h3 id="summaryMinBobot" class="text-sm font-bold text-teal-900 mt-1 truncate">-</h3>
+        </div>
+      </div>
+
+      <!-- Container Chart Interaktif -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Doughnut Chart (Proporsi Bobot) -->
+        <div class="glass-card p-6 rounded-2xl shadow-md lg:col-span-1 flex flex-col items-center justify-center bg-white/70">
+          <h4 class="font-bold text-teal-900 mb-4 text-center flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-teal-600"></i> Distribusi Proporsi Bobot KPI
+          </h4>
+          <div class="w-full max-w-[280px] relative">
+            <canvas id="kpiDoughnutChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Horizontal Bar Chart (Peringkat Bobot) -->
+        <div class="glass-card p-6 rounded-2xl shadow-md lg:col-span-2 bg-white/70">
+          <h4 class="font-bold text-teal-900 mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-chart-simple text-amber-600"></i> Peringkat Bobot Respon KPI
+          </h4>
+          <div class="w-full h-72">
+            <canvas id="kpiBarChart"></canvas>
+          </div>
+        </div>
       </div>
     </section>
   </div>
