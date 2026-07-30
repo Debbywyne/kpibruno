@@ -130,60 +130,66 @@ function buildTreeFromExcelData(rows) {
   const container = document.getElementById('treeContainer');
   if (!container) return;
 
-  // Bersihkan isi tree container
+  // 1. Bersihkan wadah tree
   container.innerHTML = '';
 
   if (!rows || rows.length === 0) {
-    showDraftNotice("Data Excel kosong!");
+    alert("Data Excel kosong atau tidak terbaca!");
     return;
   }
 
-  // Map untuk menyimpan Node DOM berdasarkan Kode KPI / Indeks
   const nodeDOMMap = {};
 
-  try {
-    // 1. Render setiap elemen Tree dari data Excel
-    rows.forEach((row, index) => {
-      // Pastikan data baris valid
-      const id = row.id || `node-${index}`;
-      const name = row.name || row.kpi_name || row['Nama KPI'] || 'KPI Tanpa Nama';
-      const level = row.level || row['Level'] || 'L1';
-      const owner = row.owner || row['Unit Owner'] || '-';
-      const parentId = row.parentId || row.parent_id || row['Parent ID'] || null;
-
-      // Buat elemen visual node tree
-      const nodeCard = createTreeNodeDOM({ id, name, level, owner, parentId });
-
-      nodeDOMMap[id] = nodeCard;
-
-      // Jika punya parent, masukkan ke dalam anak parent-nya
-      if (parentId && nodeDOMMap[parentId]) {
-        let childContainer = nodeDOMMap[parentId].querySelector('.tree-children');
-        if (!childContainer) {
-          childContainer = document.createElement('div');
-          childContainer.className = 'tree-children ml-6 pl-4 border-l-2 border-teal-200 mt-2 space-y-2';
-          nodeDOMMap[parentId].appendChild(childContainer);
-        }
-        childContainer.appendChild(nodeCard);
-      } else {
-        // Jika Root / L1, masukkan langsung ke container utama
-        container.appendChild(nodeCard);
-      }
-    });
-
-    // 2. Jalankan validasi & sinkronisasi UI secara aman
-    if (typeof runValidation === 'function') {
-      runValidation();
-    }
+  rows.forEach((row, index) => {
+    // A. Normalisasi pembacaan Properti dari berbagai kemungkinan nama kolom Excel
+    const id = (row.id || row.ID || row['Kode KPI'] || row['ID KPI'] || `node-${index + 1}`).toString().trim();
+    const name = row.name || row.Name || row['Nama KPI'] || row.kpi_name || 'KPI Tanpa Nama';
+    const level = row.level || row.Level || row['Level KPI'] || 'L1';
+    const owner = row.owner || row.Owner || row['Unit Owner'] || '-';
     
-    // Refresh dropdown parent untuk Halaman 2
-    if (typeof populateParentDropdowns === 'function') {
-      populateParentDropdowns();
+    // Ambil parent ID (bisa string, number, atau null/empty)
+    let parentId = row.parentId || row.parent_id || row['Parent ID'] || row['ID Parent'] || row['KPI Induk'] || null;
+    if (parentId) parentId = parentId.toString().trim();
+
+    // B. Buat Elemen DOM Node (Gunakan createTreeNodeDOM jika ada, atau buat fallback card jika belum ada)
+    let nodeCard;
+    if (typeof createTreeNodeDOM === 'function') {
+      nodeCard = createTreeNodeDOM({ id, name, level, owner, parentId });
+    } else {
+      // Fallback sederhana jika fungsi createTreeNodeDOM tidak ditemukan
+      nodeCard = document.createElement('div');
+      nodeCard.className = "bg-white p-3 rounded-xl border border-teal-100 shadow-sm my-2 flex items-center justify-between";
+      nodeCard.setAttribute('data-id', id);
+      nodeCard.innerHTML = `
+        <div>
+          <span class="text-xs px-2 py-0.5 bg-teal-100 text-teal-800 rounded font-bold mr-2">${level}</span>
+          <strong class="text-slate-800 text-sm">${name}</strong>
+          <span class="text-xs text-slate-500 ml-2">(${owner})</span>
+        </div>
+      `;
     }
 
-  } catch (err) {
-    console.error("Error saat merender Tree dari Excel:", err);
-  }
+    // Simpan ke Map
+    nodeDOMMap[id] = nodeCard;
+
+    // C. Tempelkan ke Hirarki UI (Anak ke Parent, atau ke Container Utama)
+    if (parentId && nodeDOMMap[parentId]) {
+      let childContainer = nodeDOMMap[parentId].querySelector('.tree-children');
+      if (!childContainer) {
+        childContainer = document.createElement('div');
+        childContainer.className = 'tree-children ml-6 pl-4 border-l-2 border-teal-300 mt-2 space-y-2';
+        nodeDOMMap[parentId].appendChild(childContainer);
+      }
+      childContainer.appendChild(nodeCard);
+    } else {
+      // Masukkan ke wadah utama (Root level)
+      container.appendChild(nodeCard);
+    }
+  });
+
+  // 2. Refresh UI Validasi dan Dropdown
+  if (typeof runValidation === 'function') runValidation();
+  if (typeof populateParentDropdowns === 'function') populateParentDropdowns();
 }
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
