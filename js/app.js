@@ -2,88 +2,125 @@ let currentCluster = 'BOD-2';
 
 document.addEventListener('DOMContentLoaded', () => {
   changeCluster();
-  if (document.querySelectorAll('#treeContainer > [data-level="L1"]').length === 0) {
+  
+  // Jika kontainer kosong, tambahkan akar L1
+  const treeContainer = document.getElementById('treeContainer');
+  if (treeContainer && treeContainer.querySelectorAll(':scope > [data-level="L1"]').length === 0) {
     addL1Root();
   }
 
-  // Otomatis tawarkan muat draft jika ditemukan data tersimpan
-  if (localStorage.getItem('kpi_app_draft')) {
-    setTimeout(() => {
-      if (confirm('Ditemukan draft pengisian KPI tersimpan. Apakah Anda ingin memuat draft tersebut?')) {
-        loadDraft();
-      }
-    }, 400);
+  // Cek apakah ada draft saat halaman pertama kali dimuat
+  try {
+    if (localStorage.getItem('kpi_app_draft')) {
+      setTimeout(() => {
+        if (confirm('Ditemukan draft pengisian KPI tersimpan. Apakah Anda ingin memuat draft tersebut?')) {
+          loadDraft();
+        }
+      }, 500);
+    }
+  } catch (e) {
+    console.warn('LocalStorage tidak diizinkan atau tidak didukung di environment ini:', e);
   }
 });
 
 // ==========================================
-// FITUR SAVE & LOAD DRAFT GLOBAL (PAGE 1 & 2)
+// FITUR SAVE & LOAD DRAFT GLOBAL
 // ==========================================
 
 function saveDraft() {
-  const draftData = {
-    cluster: currentCluster,
-    treeData: serializeTree(document.getElementById('treeContainer')),
-    formData: serializeForm()
-  };
+  try {
+    const treeContainer = document.getElementById('treeContainer');
+    const draftData = {
+      cluster: currentCluster,
+      treeData: treeContainer ? serializeTree(treeContainer) : [],
+      formData: serializeForm()
+    };
 
-  localStorage.setItem('kpi_app_draft', JSON.stringify(draftData));
-  showDraftNotice('Draft Pemetaan (Page 1) & Form Detail (Page 2) berhasil disimpan!');
+    localStorage.setItem('kpi_app_draft', JSON.stringify(draftData));
+    showDraftNotice('Draft Pemetaan & Form Detail berhasil disimpan!');
+  } catch (err) {
+    console.error('Gagal menyimpan draft:', err);
+    alert('Gagal menyimpan draft! Pastikan browser Anda mengizinkan penyimpanan lokal (LocalStorage).');
+  }
 }
 
 function loadDraft() {
-  const saved = localStorage.getItem('kpi_app_draft');
-  if (!saved) {
-    alert('Tidak ditemukan draft tersimpan di browser ini!');
-    return;
-  }
-
   try {
+    const saved = localStorage.getItem('kpi_app_draft');
+    if (!saved) {
+      alert('Tidak ditemukan draft tersimpan di browser ini!');
+      return;
+    }
+
     const draftData = JSON.parse(saved);
 
     // Restore Kluster
     if (draftData.cluster) {
-      document.getElementById('clusterSelect').value = draftData.cluster;
-      currentCluster = draftData.cluster;
+      const clusterSelect = document.getElementById('clusterSelect');
+      if (clusterSelect) {
+        clusterSelect.value = draftData.cluster;
+        currentCluster = draftData.cluster;
+      }
     }
 
-    // Restore Page 1 (Pohon Pemetaan)
+    // Restore Page 1 (Tree Builder)
     if (draftData.treeData && draftData.treeData.length > 0) {
       const container = document.getElementById('treeContainer');
-      container.innerHTML = '';
-      draftData.treeData.forEach(nodeData => {
-        container.appendChild(deserializeNode(nodeData));
-      });
+      if (container) {
+        container.innerHTML = '';
+        draftData.treeData.forEach(nodeData => {
+          container.appendChild(deserializeNode(nodeData));
+        });
+      }
     }
 
-    // Restore Page 2 (Form Tabel Detail)
+    // Restore Page 2 (Form Detail Tabel)
     if (draftData.formData) {
       const tbody = document.getElementById('kpiTableBody');
-      tbody.innerHTML = '';
+      if (tbody) {
+        tbody.innerHTML = '';
+        draftData.formData.forEach(item => {
+          addKPIRow();
+          const tr = tbody.lastElementChild;
 
-      draftData.formData.forEach(item => {
-        addKPIRow();
-        const tr = tbody.lastElementChild;
+          if (tr) {
+            const levelSelect = tr.querySelector('.kpi-level');
+            if (levelSelect) {
+              levelSelect.value = item.level;
+              onLevelSelectChange(levelSelect);
+            }
 
-        tr.querySelector('.kpi-level').value = item.level;
-        onLevelSelectChange(tr.querySelector('.kpi-level'));
+            const parentSelect = tr.querySelector('.kpi-parent-select');
+            if (parentSelect && item.parent) {
+              parentSelect.value = item.parent;
+              onParentSelectChange(parentSelect);
+            }
 
-        if (item.parent) tr.querySelector('.kpi-parent-select').value = item.parent;
-        onParentSelectChange(tr.querySelector('.kpi-parent-select'));
+            const ownerSelect = tr.querySelector('.kpi-owner-select');
+            if (ownerSelect && item.owner) {
+              ownerSelect.value = item.owner;
+              onOwnerSelectChange(ownerSelect);
+            }
 
-        if (item.owner) tr.querySelector('.kpi-owner-select').value = item.owner;
-        onOwnerSelectChange(tr.querySelector('.kpi-owner-select'));
+            const childSelect = tr.querySelector('.kpi-child-select');
+            if (childSelect && item.child) {
+              childSelect.value = item.child;
+            }
 
-        if (item.child) tr.querySelector('.kpi-child-select').value = item.child;
-        tr.querySelector('.kpi-target').value = item.target || '';
-        tr.querySelector('.kpi-bobot').value = item.bobot || 0;
-      });
+            const targetInput = tr.querySelector('.kpi-target');
+            if (targetInput) targetInput.value = item.target || '';
+
+            const bobotInput = tr.querySelector('.kpi-bobot');
+            if (bobotInput) bobotInput.value = item.bobot || 0;
+          }
+        });
+      }
     }
 
     runValidation();
-    showDraftNotice('Draft Page 1 & Page 2 berhasil dimuat kembali!');
+    showDraftNotice('Draft berhasil dimuat kembali!');
   } catch (err) {
-    console.error(err);
+    console.error('Gagal memuat draft:', err);
     alert('Gagal membaca data draft.');
   }
 }
@@ -94,7 +131,11 @@ function showDraftNotice(msg) {
   if (notice && noticeText) {
     noticeText.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 me-1"></i> ${msg}`;
     notice.classList.remove('hidden');
-    setTimeout(() => { notice.classList.add('hidden'); }, 4000);
+    setTimeout(() => { 
+      notice.classList.add('hidden'); 
+    }, 4000);
+  } else {
+    alert(msg);
   }
 }
 
@@ -129,7 +170,7 @@ function deserializeNode(data) {
 
   const nextLevel = nextLevelMap[data.level];
   const addButtonHTML = nextLevel ? `
-    <button onclick="addChildNode('${data.id}', '${nextLevel}')" class="btn-teal text-xs px-2.5 py-1 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
+    <button type="button" onclick="addChildNode('${data.id}', '${nextLevel}')" class="btn-teal text-xs px-2.5 py-1 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
       <i class="fa-solid fa-plus"></i> Respon ${nextLevel}
     </button>
   ` : '';
@@ -141,7 +182,7 @@ function deserializeNode(data) {
         ${renderOwnerField(data.level)}
         <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1.5 text-sm font-semibold node-title" placeholder="Nama KPI ${data.level}..." value="${data.title || ''}">
         ${addButtonHTML}
-        <button onclick="removeTreeNode('${data.id}')" class="text-rose-600 hover:text-rose-800 px-2 transition-colors"><i class="fa-solid fa-trash"></i></button>
+        <button type="button" onclick="removeTreeNode('${data.id}')" class="text-rose-600 hover:text-rose-800 px-2 transition-colors"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="children-container pl-6 border-l-2 border-teal-600/30 space-y-3 mt-3"></div>
     </div>
@@ -169,12 +210,12 @@ function serializeForm() {
 
   rows.forEach(tr => {
     items.push({
-      level: tr.querySelector('.kpi-level').value,
-      parent: tr.querySelector('.kpi-parent-select').value,
-      owner: tr.querySelector('.kpi-owner-select').value,
-      child: tr.querySelector('.kpi-child-select').value,
-      target: tr.querySelector('.kpi-target').value,
-      bobot: tr.querySelector('.kpi-bobot').value
+      level: tr.querySelector('.kpi-level') ? tr.querySelector('.kpi-level').value : '',
+      parent: tr.querySelector('.kpi-parent-select') ? tr.querySelector('.kpi-parent-select').value : '',
+      owner: tr.querySelector('.kpi-owner-select') ? tr.querySelector('.kpi-owner-select').value : '',
+      child: tr.querySelector('.kpi-child-select') ? tr.querySelector('.kpi-child-select').value : '',
+      target: tr.querySelector('.kpi-target') ? tr.querySelector('.kpi-target').value : '',
+      bobot: tr.querySelector('.kpi-bobot') ? tr.querySelector('.kpi-bobot').value : 0
     });
   });
 
@@ -182,7 +223,7 @@ function serializeForm() {
 }
 
 // ==========================================
-// NAVIGASI & ATURAN
+// NAVIGASI TAB & ATURAN
 // ==========================================
 
 function switchTab(tabIndex) {
@@ -190,13 +231,19 @@ function switchTab(tabIndex) {
     const btn = document.getElementById(`tabBtn${i}`);
     const page = document.getElementById(`page${i}`);
     if (i === tabIndex) {
-      btn.className = "py-3 px-6 font-bold rounded-xl text-teal-900 bg-white/90 shadow-md flex items-center gap-2 whitespace-nowrap transition-all border border-white";
-      btn.querySelector('span').className = "bg-palette-teal text-white rounded-lg w-6 h-6 text-xs flex items-center justify-center font-black";
-      page.classList.remove('hidden');
+      if (btn) {
+        btn.className = "py-3 px-6 font-bold rounded-xl text-teal-900 bg-white/90 shadow-md flex items-center gap-2 whitespace-nowrap transition-all border border-white";
+        const badge = btn.querySelector('span');
+        if (badge) badge.className = "bg-palette-teal text-white rounded-lg w-6 h-6 text-xs flex items-center justify-center font-black";
+      }
+      if (page) page.classList.remove('hidden');
     } else {
-      btn.className = "py-3 px-6 font-semibold rounded-xl text-teal-900/70 hover:bg-white/40 flex items-center gap-2 whitespace-nowrap transition-all";
-      btn.querySelector('span').className = "bg-teal-900/20 text-teal-900 rounded-lg w-6 h-6 text-xs flex items-center justify-center font-bold";
-      page.classList.add('hidden');
+      if (btn) {
+        btn.className = "py-3 px-6 font-semibold rounded-xl text-teal-900/70 hover:bg-white/40 flex items-center gap-2 whitespace-nowrap transition-all";
+        const badge = btn.querySelector('span');
+        if (badge) badge.className = "bg-teal-900/20 text-teal-900 rounded-lg w-6 h-6 text-xs flex items-center justify-center font-bold";
+      }
+      if (page) page.classList.add('hidden');
     }
   });
 
@@ -209,7 +256,10 @@ function switchTab(tabIndex) {
 }
 
 function changeCluster() {
-  currentCluster = document.getElementById('clusterSelect').value;
+  const clusterSelect = document.getElementById('clusterSelect');
+  if (clusterSelect) {
+    currentCluster = clusterSelect.value;
+  }
   updateAllKPIRowsRules();
   runValidation();
 }
@@ -241,6 +291,8 @@ function renderOwnerField(level) {
 
 function addL1Root() {
   const container = document.getElementById('treeContainer');
+  if (!container) return;
+  
   const rootId = 'node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
 
   const rootHTML = `
@@ -249,10 +301,10 @@ function addL1Root() {
         <span class="bg-palette-teal text-white font-black px-2.5 py-1 rounded-lg text-xs shrink-0 shadow-sm">L1</span>
         ${renderOwnerField('L1')}
         <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1.5 text-sm font-semibold node-title" placeholder="Nama KPI Level 1 (Korporasi)...">
-        <button onclick="addChildNode('${rootId}', 'L2')" class="btn-coral text-white text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
+        <button type="button" onclick="addChildNode('${rootId}', 'L2')" class="btn-coral text-white text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
           <i class="fa-solid fa-plus"></i> Respon L2
         </button>
-        <button onclick="removeTreeNode('${rootId}')" class="text-rose-600 hover:text-rose-800 px-2 transition-colors"><i class="fa-solid fa-trash"></i></button>
+        <button type="button" onclick="removeTreeNode('${rootId}')" class="text-rose-600 hover:text-rose-800 px-2 transition-colors"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="children-container pl-6 border-l-2 border-teal-600/30 space-y-3 mt-3"></div>
     </div>
@@ -262,6 +314,8 @@ function addL1Root() {
 
 function addChildNode(parentId, childLevel) {
   const parentNode = document.getElementById(parentId);
+  if (!parentNode) return;
+
   const childrenContainer = parentNode.querySelector(':scope > .children-container');
   const childId = 'node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
 
@@ -272,7 +326,7 @@ function addChildNode(parentId, childLevel) {
   const borderColorMap = { 'L2': 'border-palette-coral', 'L3': 'border-palette-teal', 'L4': 'border-palette-gold', 'L5': 'border-purple-600' };
 
   const addButtonHTML = nextLevel ? `
-    <button onclick="addChildNode('${childId}', '${nextLevel}')" class="btn-teal text-xs px-2.5 py-1 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
+    <button type="button" onclick="addChildNode('${childId}', '${nextLevel}')" class="btn-teal text-xs px-2.5 py-1 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
       <i class="fa-solid fa-plus"></i> Respon ${nextLevel}
     </button>
   ` : '';
@@ -284,7 +338,7 @@ function addChildNode(parentId, childLevel) {
         ${renderOwnerField(childLevel)}
         <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1 text-sm font-medium node-title" placeholder="Nama Respon KPI ${childLevel}...">
         ${addButtonHTML}
-        <button onclick="removeTreeNode('${childId}')" class="text-rose-600 hover:text-rose-800 px-2 text-xs transition-colors"><i class="fa-solid fa-trash"></i></button>
+        <button type="button" onclick="removeTreeNode('${childId}')" class="text-rose-600 hover:text-rose-800 px-2 text-xs transition-colors"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="children-container pl-6 border-l-2 border-teal-600/30 space-y-3 mt-3"></div>
     </div>
@@ -304,6 +358,8 @@ function removeTreeNode(nodeId) {
 
 function addKPIRow() {
   const tbody = document.getElementById('kpiTableBody');
+  if (!tbody) return;
+
   const rowId = 'kpi-' + Date.now();
   const tr = document.createElement('tr');
   tr.id = rowId;
@@ -341,7 +397,7 @@ function addKPIRow() {
       <input type="number" min="0" max="100" class="w-full glass-input rounded-lg p-1.5 text-xs font-bold text-center kpi-bobot" value="0" oninput="runValidation()">
     </td>
     <td class="p-2 border-b border-white/40 text-center">
-      <button onclick="removeRow('${rowId}'); runValidation();" class="text-rose-600 hover:text-rose-800 transition-colors"><i class="fa-solid fa-trash"></i></button>
+      <button type="button" onclick="removeRow('${rowId}'); runValidation();" class="text-rose-600 hover:text-rose-800 transition-colors"><i class="fa-solid fa-trash"></i></button>
     </td>
   `;
   tbody.appendChild(tr);
@@ -356,7 +412,7 @@ function updateAllKPIRowsRules() {
 
 function updateKPIRowRules(tr) {
   const levelSelect = tr.querySelector('.kpi-level');
-  if (typeof KPI_RULES === 'undefined' || !KPI_RULES[currentCluster]) return;
+  if (!levelSelect || typeof KPI_RULES === 'undefined' || !KPI_RULES[currentCluster]) return;
   const clusterRules = KPI_RULES[currentCluster];
 
   Array.from(levelSelect.options).forEach(opt => {
@@ -380,13 +436,14 @@ function updateKPIRowRules(tr) {
 
 function onLevelSelectChange(selectElem) {
   const tr = selectElem.closest('tr');
-  populateParentDropdown(tr);
+  if (tr) populateParentDropdown(tr);
   runValidation();
 }
 
 function populateParentDropdown(tr) {
   const selectedLevel = tr.querySelector('.kpi-level').value;
   const parentSelect = tr.querySelector('.kpi-parent-select');
+  if (!parentSelect) return;
 
   const parentLevelMap = { 'L1': null, 'L2': 'L1', 'L3': 'L2', 'L4': 'L3', 'L5': 'L4' };
   const parentLevel = parentLevelMap[selectedLevel];
@@ -403,7 +460,8 @@ function populateParentDropdown(tr) {
 
     const parentNodes = document.querySelectorAll(`#treeContainer [data-level="${parentLevel}"]`);
     parentNodes.forEach(node => {
-      const titleVal = node.querySelector('.node-title').value.trim();
+      const titleInput = node.querySelector('.node-title');
+      const titleVal = titleInput ? titleInput.value.trim() : '';
       if (titleVal) {
         const opt = document.createElement('option');
         opt.value = node.id;
@@ -418,13 +476,14 @@ function populateParentDropdown(tr) {
 
 function onParentSelectChange(selectElem) {
   const tr = selectElem.closest('tr');
-  populateOwnerDropdown(tr);
+  if (tr) populateOwnerDropdown(tr);
 }
 
 function populateOwnerDropdown(tr) {
   const selectedLevel = tr.querySelector('.kpi-level').value;
   const parentId = tr.querySelector('.kpi-parent-select').value;
   const ownerSelect = tr.querySelector('.kpi-owner-select');
+  if (!ownerSelect) return;
 
   ownerSelect.innerHTML = `<option value="">-- Pilih Owner --</option>`;
 
@@ -440,7 +499,8 @@ function populateOwnerDropdown(tr) {
 
   const uniqueOwners = new Set();
   eligibleNodes.forEach(node => {
-    const ownerVal = node.querySelector('.node-owner').value.trim();
+    const ownerElem = node.querySelector('.node-owner');
+    const ownerVal = ownerElem ? ownerElem.value.trim() : '';
     if (ownerVal) uniqueOwners.add(ownerVal);
   });
 
@@ -460,7 +520,7 @@ function populateOwnerDropdown(tr) {
 
 function onOwnerSelectChange(selectElem) {
   const tr = selectElem.closest('tr');
-  populateChildDropdown(tr);
+  if (tr) populateChildDropdown(tr);
 }
 
 function populateChildDropdown(tr) {
@@ -468,6 +528,7 @@ function populateChildDropdown(tr) {
   const parentId = tr.querySelector('.kpi-parent-select').value;
   const selectedOwner = tr.querySelector('.kpi-owner-select').value;
   const childSelect = tr.querySelector('.kpi-child-select');
+  if (!childSelect) return;
 
   childSelect.innerHTML = `<option value="">-- Pilih Respon KPI ${selectedLevel} --</option>`;
 
@@ -488,8 +549,10 @@ function populateChildDropdown(tr) {
 
   let countKPI = 0;
   eligibleNodes.forEach(node => {
-    const nodeOwner = node.querySelector('.node-owner').value.trim();
-    const nodeTitle = node.querySelector('.node-title').value.trim();
+    const nodeOwnerElem = node.querySelector('.node-owner');
+    const nodeTitleElem = node.querySelector('.node-title');
+    const nodeOwner = nodeOwnerElem ? nodeOwnerElem.value.trim() : '';
+    const nodeTitle = nodeTitleElem ? nodeTitleElem.value.trim() : '';
 
     if (nodeOwner === selectedOwner && nodeTitle) {
       const opt = document.createElement('option');
@@ -513,8 +576,10 @@ function runValidation() {
   let items = [];
 
   rows.forEach(tr => {
-    const jenis = tr.querySelector('.kpi-level').value;
-    const bobot = parseFloat(tr.querySelector('.kpi-bobot').value) || 0;
+    const levelElem = tr.querySelector('.kpi-level');
+    const bobotElem = tr.querySelector('.kpi-bobot');
+    const jenis = levelElem ? levelElem.value : 'L3';
+    const bobot = bobotElem ? parseFloat(bobotElem.value) || 0 : 0;
     items.push({ jenis, bobot });
   });
 
@@ -549,7 +614,7 @@ function updateSidebarUI(result, items) {
 }
 
 // ==========================================
-// EXPORT EXCEL DAN PDF
+// EXPORT EXCEL & PDF
 // ==========================================
 
 function exportToExcel() {
@@ -560,25 +625,31 @@ function exportToExcel() {
     const parentSelect = tr.querySelector('.kpi-parent-select');
     const childSelect = tr.querySelector('.kpi-child-select');
     const ownerSelect = tr.querySelector('.kpi-owner-select');
+    const targetInput = tr.querySelector('.kpi-target');
+    const bobotInput = tr.querySelector('.kpi-bobot');
 
-    const parentText = parentSelect.disabled ? '-' : (parentSelect.options[parentSelect.selectedIndex]?.text || '-');
-    const ownerText = ownerSelect.value || '-';
-    const childText = childSelect.options[childSelect.selectedIndex]?.text || '-';
+    const parentText = (!parentSelect || parentSelect.disabled) ? '-' : (parentSelect.options[parentSelect.selectedIndex]?.text || '-');
+    const ownerText = ownerSelect ? (ownerSelect.value || '-') : '-';
+    const childText = childSelect ? (childSelect.options[childSelect.selectedIndex]?.text || '-') : '-';
 
     excelData.push({
-      "Level": tr.querySelector('.kpi-level').value,
+      "Level": tr.querySelector('.kpi-level') ? tr.querySelector('.kpi-level').value : '-',
       "KPI Induk (Parent)": parentText,
       "Unit Owner": ownerText,
       "Respon KPI": childText,
-      "Target": tr.querySelector('.kpi-target').value,
-      "Bobot (%)": tr.querySelector('.kpi-bobot').value + "%"
+      "Target": targetInput ? targetInput.value : '',
+      "Bobot (%)": bobotInput ? bobotInput.value + "%" : '0%'
     });
   });
 
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Form KPI Org");
-  XLSX.writeFile(workbook, `KPI_Report_${currentCluster}.xlsx`);
+  if (typeof XLSX !== 'undefined') {
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Form KPI Org");
+    XLSX.writeFile(workbook, `KPI_Report_${currentCluster}.xlsx`);
+  } else {
+    alert('Library SheetJS (XLSX) belum terisi dengan benar.');
+  }
 }
 
 function exportToPDF() {
@@ -590,19 +661,21 @@ function exportToPDF() {
     const parentSelect = tr.querySelector('.kpi-parent-select');
     const childSelect = tr.querySelector('.kpi-child-select');
     const ownerSelect = tr.querySelector('.kpi-owner-select');
+    const targetInput = tr.querySelector('.kpi-target');
+    const bobotInput = tr.querySelector('.kpi-bobot');
 
-    const parentText = parentSelect.disabled ? '-' : (parentSelect.options[parentSelect.selectedIndex]?.text || '-');
-    const ownerText = ownerSelect.value || '-';
-    const childText = childSelect.options[childSelect.selectedIndex]?.text || '-';
+    const parentText = (!parentSelect || parentSelect.disabled) ? '-' : (parentSelect.options[parentSelect.selectedIndex]?.text || '-');
+    const ownerText = ownerSelect ? (ownerSelect.value || '-') : '-';
+    const childText = childSelect ? (childSelect.options[childSelect.selectedIndex]?.text || '-') : '-';
 
     tableRowsHTML += `
       <tr>
-        <td style="border: 1px solid #ccc; padding: 6px;">${tr.querySelector('.kpi-level').value}</td>
+        <td style="border: 1px solid #ccc; padding: 6px;">${tr.querySelector('.kpi-level')?.value || '-'}</td>
         <td style="border: 1px solid #ccc; padding: 6px;">${parentText}</td>
         <td style="border: 1px solid #ccc; padding: 6px;">${ownerText}</td>
         <td style="border: 1px solid #ccc; padding: 6px;">${childText}</td>
-        <td style="border: 1px solid #ccc; padding: 6px;">${tr.querySelector('.kpi-target').value}</td>
-        <td style="border: 1px solid #ccc; padding: 6px;">${tr.querySelector('.kpi-bobot').value}%</td>
+        <td style="border: 1px solid #ccc; padding: 6px;">${targetInput?.value || ''}</td>
+        <td style="border: 1px solid #ccc; padding: 6px;">${bobotInput?.value || 0}%</td>
       </tr>
     `;
   });
@@ -636,15 +709,21 @@ function exportToPDF() {
     </div>
   `;
 
-  html2pdf().from(element).save(`Form_KPI_${currentCluster}.pdf`);
+  if (typeof html2pdf !== 'undefined') {
+    html2pdf().from(element).save(`Form_KPI_${currentCluster}.pdf`);
+  } else {
+    alert('Library html2pdf belum dimuat.');
+  }
 }
 
 // ==========================================
-// VISUALISASI HIERARKI (HALAMAN 3)
+// VISUALISASI TREE CHART (HALAMAN 3)
 // ==========================================
 
 function renderInteractiveTree() {
   const container = document.getElementById('tree_chart_container');
+  if (!container) return;
+
   const rootNodes = document.querySelectorAll('#treeContainer > [data-level="L1"]');
 
   if (rootNodes.length === 0) {
@@ -660,8 +739,11 @@ function renderInteractiveTree() {
 
 function buildNodeTreeHTML(node) {
   const level = node.getAttribute('data-level');
-  const title = node.querySelector('.node-title').value.trim() || `(Tanpa Nama ${level})`;
-  const owner = node.querySelector('.node-owner').value.trim() || '-';
+  const titleElem = node.querySelector('.node-title');
+  const ownerElem = node.querySelector('.node-owner');
+
+  const title = (titleElem && titleElem.value.trim()) ? titleElem.value.trim() : `(Tanpa Nama ${level})`;
+  const owner = (ownerElem && ownerElem.value.trim()) ? ownerElem.value.trim() : '-';
 
   const badgeColors = { 'L1': 'bg-palette-teal text-white', 'L2': 'bg-palette-coral text-white', 'L3': 'bg-palette-teal text-white', 'L4': 'bg-palette-gold text-teal-900', 'L5': 'bg-purple-600 text-white' };
   const borderLeftColors = { 'L1': 'border-l-palette-teal', 'L2': 'border-l-palette-coral', 'L3': 'border-l-palette-teal', 'L4': 'border-l-palette-gold', 'L5': 'border-l-purple-600' };
