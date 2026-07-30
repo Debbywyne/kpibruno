@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Custom Palette Utilities */
+.bg-palette-teal { background-color: #249d8f; }
+.bg-palette-coral { background-color: #e76f51; }
+.bg-palette-gold { background-color: #e9c46a; }
+.bg-palette-sand { background-color: #fdf0d5; }
+
+.text-palette-teal { color: #249d8f; }
+.text-palette-coral { color: #e76f51; }
+.text-palette-gold { color: #e9c46a; }
+
+.border-palette-teal { border-color: #249d8f; }
+.border-palette-coral { border-color: #e76f51; }
+.border-palette-gold { border-color: #e9c46a; }
+
+/* Glassmorphism Styles */
+.glass-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.95);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(36, 157, 143, 0.4);
+}
+
+/* Button Custom Styles */
+.btn-teal {
+  background-color: #249d8f;
+  color: white;
+}
+.btn-teal:hover {
+  background-color: #1d8276;
+}
+
+.btn-coral {
+  background-color: #e76f51;
+  color: white;
+}
+.btn-coral:hover {
+  background-color: #d45a3d;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(36, 157, 143, 0.4);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(36, 157, 143, 0.7);
+}
