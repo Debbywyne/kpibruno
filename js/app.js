@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.warn('LocalStorage tidak diizinkan atau tidak didukung di environment ini:', e);
   }
 });
+
 // ==========================================
 // 1. FUNGSI UNDUH TEMPLATE EXCEL BERSAMA CONTOH DATA
 // ==========================================
@@ -31,57 +32,18 @@ function downloadExcelTemplate() {
     return;
   }
 
-  // Sample Data mencakup kasus: 1 L1 direspon oleh 2 L2
   const sampleData = [
-    {
-      "ID": "NODE-1",
-      "Level": "L1",
-      "Unit Owner": "ADHI",
-      "Nama KPI": "Meningkatkan Ebitda Korporasi",
-      "Parent ID": ""
-    },
-    {
-      "ID": "NODE-2",
-      "Level": "L2",
-      "Unit Owner": "DIREKTORAT HC DAN LEGAL",
-      "Nama KPI": "Optimalisasi Human Capital & HC Tech",
-      "Parent ID": "NODE-1" // Respon L2 Pertama ke NODE-1
-    },
-    {
-      "ID": "NODE-3",
-      "Level": "L2",
-      "Unit Owner": "DIREKTORAT KEUANGAN",
-      "Nama KPI": "Pengendalian Efisiensi Biaya Operasional",
-      "Parent ID": "NODE-1" // Respon L2 Kedua ke NODE-1
-    },
-    {
-      "ID": "NODE-4",
-      "Level": "L3",
-      "Unit Owner": "DEPARTEMEN HC",
-      "Nama KPI": "Implementasi Talent Management System",
-      "Parent ID": "NODE-2" // Anak dari Respon L2 Pertama
-    },
-    {
-      "ID": "NODE-5",
-      "Level": "L4",
-      "Unit Owner": "BOPH",
-      "Nama KPI": "Penyusunan Framework Competency & Leadership",
-      "Parent ID": "NODE-4"
-    },
-    {
-      "ID": "NODE-6",
-      "Level": "L3",
-      "Unit Owner": "DEPARTEMEN KEUANGAN",
-      "Nama KPI": "Penataan Liquidity Management & Cashflow",
-      "Parent ID": "NODE-3" // Anak dari Respon L2 Kedua
-    }
+    { "ID": "NODE-1", "Level": "L1", "Unit Owner": "ADHI", "Nama KPI": "Meningkatkan Ebitda Korporasi", "Parent ID": "" },
+    { "ID": "NODE-2", "Level": "L2", "Unit Owner": "DIREKTORAT HC DAN LEGAL", "Nama KPI": "Optimalisasi Human Capital & HC Tech", "Parent ID": "NODE-1" },
+    { "ID": "NODE-3", "Level": "L2", "Unit Owner": "DIREKTORAT KEUANGAN", "Nama KPI": "Pengendalian Efisiensi Biaya Operasional", "Parent ID": "NODE-1" },
+    { "ID": "NODE-4", "Level": "L3", "Unit Owner": "DEPARTEMEN HC", "Nama KPI": "Implementasi Talent Management System", "Parent ID": "NODE-2" },
+    { "ID": "NODE-5", "Level": "L4", "Unit Owner": "BOPH", "Nama KPI": "Penyusunan Framework Competency & Leadership", "Parent ID": "NODE-4" },
+    { "ID": "NODE-6", "Level": "L3", "Unit Owner": "DEPARTEMEN KEUANGAN", "Nama KPI": "Penataan Liquidity Management & Cashflow", "Parent ID": "NODE-3" }
   ];
 
   const worksheet = XLSX.utils.json_to_sheet(sampleData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Template Tree KPI");
-
-  // Download File
   XLSX.writeFile(workbook, "Template_Import_Tree_KPI.xlsx");
 }
 
@@ -126,14 +88,11 @@ function handleExcelImport(event) {
 // ==========================================
 // 3. LOGIKA MEMBANGUN STRUKTUR TREE BERDASARKAN PARENT ID
 // ==========================================
-// Tambahkan variabel global ini di bagian atas file app.js (di luar fungsi manapun)
-let allTreeKPIs = [];
-
 function buildTreeFromExcelData(rows) {
   const container = document.getElementById('treeContainer');
   if (!container) return;
 
-  container.innerHTML = ''; 
+  container.innerHTML = '';
 
   if (!rows || rows.length === 0) {
     alert("Data Excel kosong!");
@@ -141,9 +100,7 @@ function buildTreeFromExcelData(rows) {
   }
 
   const nodeDOMMap = {};
-  allTreeKPIs = []; // Reset penampung global
 
-  // 1. Proses baris Excel
   rows.forEach((row, index) => {
     const id = row['ID'] ? String(row['ID']).trim() : ('node-' + Date.now() + '-' + index);
     const level = row['Level'] ? String(row['Level']).toUpperCase().trim() : 'L1';
@@ -151,52 +108,179 @@ function buildTreeFromExcelData(rows) {
     const title = row['Nama KPI'] || '';
     const parentId = row['Parent ID'] ? String(row['Parent ID']).trim() : null;
 
-    // Simpan ke array global untuk dropdown form
-    allTreeKPIs.push({ id, level, title, owner });
-
     const nodeData = { id, level, owner, title, parentId, children: [] };
     const nodeElement = deserializeNode(nodeData);
     
-    nodeDOMMap[id] = { element: nodeElement, parentId: parentId };
+    nodeDOMMap[id] = { element: nodeElement, parentId };
   });
 
-  // 2. Render ke DOM Tree
   Object.keys(nodeDOMMap).forEach(id => {
     const item = nodeDOMMap[id];
-    if (!item.parentId || !nodeDOMMap[item.parentId]) {
+    const parentId = item.parentId;
+
+    if (!parentId || !nodeDOMMap[parentId]) {
       container.appendChild(item.element);
     } else {
-      const parentElement = nodeDOMMap[item.parentId].element;
-      let childrenContainer = parentElement.querySelector('.children-container') || parentElement.querySelector('[class*="children"]') || parentElement;
+      const parentElement = nodeDOMMap[parentId].element;
+      let childrenContainer = parentElement.querySelector('.children-container') || parentElement;
       childrenContainer.appendChild(item.element);
     }
   });
 
-  // 3. Paksa isi dropdown Form Halaman 2 langsung dari data `allTreeKPIs`
+  // Beri jeda agar DOM ter-render sempurna sebelum mengisi dropdown Halaman 2
   setTimeout(() => {
-    populateParentDropdownsDirectly();
+    populateParentDropdowns();
     if (typeof runValidation === 'function') runValidation();
   }, 100);
 }
 
-// Fungsi khusus pengisi dropdown langsung dari data master
-function populateParentDropdownsDirectly() {
-  const parentSelects = document.querySelectorAll('#kpiTableBody .kpi-parent, .parent-select');
-
-  parentSelects.forEach(select => {
-    const currentValue = select.value;
-    select.innerHTML = '<option value="">-- Pilih Induk --</option>';
-
-    allTreeKPIs.forEach(opt => {
-      const optionElement = document.createElement('option');
-      optionElement.value = opt.id;
-      optionElement.textContent = `[${opt.level}] ${opt.title} (${opt.owner})`;
-      select.appendChild(optionElement);
-    });
-
-    if (currentValue) select.value = currentValue;
-  });
+// ==========================================
+// 4. LOGIKA SINKRONISASI DROPDOWN HALAMAN 2
+// ==========================================
+function populateParentDropdowns() {
+  const rows = document.querySelectorAll('#kpiTableBody tr');
+  rows.forEach(tr => populateParentDropdown(tr));
 }
+
+function populateParentDropdown(tr) {
+  const levelSelect = tr.querySelector('.kpi-level');
+  const parentSelect = tr.querySelector('.kpi-parent') || tr.querySelector('.kpi-parent-select');
+  if (!levelSelect || !parentSelect) return;
+
+  const selectedLevel = levelSelect.value;
+  const parentLevelMap = { 'L1': null, 'L2': 'L1', 'L3': 'L2', 'L4': 'L3', 'L5': 'L4' };
+  const parentLevel = parentLevelMap[selectedLevel];
+
+  const currentVal = parentSelect.value;
+  parentSelect.innerHTML = '';
+
+  if (!parentLevel) {
+    parentSelect.innerHTML = `<option value="">-- Tanpa Induk (L1) --</option>`;
+    parentSelect.disabled = true;
+  } else {
+    parentSelect.disabled = false;
+    parentSelect.innerHTML = `<option value="">-- Pilih Induk ${parentLevel} --</option>`;
+
+    const parentNodes = document.querySelectorAll(`#treeContainer [data-level="${parentLevel}"]`);
+    parentNodes.forEach(node => {
+      const titleInput = node.querySelector('.node-title');
+      const titleVal = titleInput ? titleInput.value.trim() : '';
+      if (titleVal) {
+        const opt = document.createElement('option');
+        opt.value = node.id;
+        opt.textContent = `[${parentLevel}] ${titleVal}`;
+        parentSelect.appendChild(opt);
+      }
+    });
+  }
+
+  if (currentVal && Array.from(parentSelect.options).some(o => o.value === currentVal)) {
+    parentSelect.value = currentVal;
+  }
+
+  onParentChange(parentSelect);
+}
+
+function onParentChange(parentElem) {
+  const tr = parentElem.closest('tr');
+  if (!tr) return;
+
+  const levelSelect = tr.querySelector('.kpi-level');
+  const ownerSelect = tr.querySelector('.kpi-owner') || tr.querySelector('.kpi-owner-select');
+  if (!levelSelect || !ownerSelect) return;
+
+  const selectedLevel = levelSelect.value;
+  const parentId = parentElem.value;
+  const currentOwnerVal = ownerSelect.value;
+
+  ownerSelect.innerHTML = `<option value="">-- Pilih Owner --</option>`;
+
+  let eligibleNodes = [];
+  if (selectedLevel === 'L1') {
+    eligibleNodes = Array.from(document.querySelectorAll('#treeContainer > [data-level="L1"]'));
+  } else if (parentId) {
+    const parentNode = document.getElementById(parentId);
+    if (parentNode) {
+      eligibleNodes = Array.from(parentNode.querySelectorAll(`:scope > .children-container > [data-level="${selectedLevel}"]`));
+    }
+  }
+
+  const uniqueOwners = new Set();
+  eligibleNodes.forEach(node => {
+    const ownerElem = node.querySelector('.node-owner');
+    const ownerVal = ownerElem ? ownerElem.value.trim() : '';
+    if (ownerVal) uniqueOwners.add(ownerVal);
+  });
+
+  uniqueOwners.forEach(ownerName => {
+    const opt = document.createElement('option');
+    opt.value = ownerName;
+    opt.textContent = ownerName;
+    ownerSelect.appendChild(opt);
+  });
+
+  if (currentOwnerVal && Array.from(ownerSelect.options).some(o => o.value === currentOwnerVal)) {
+    ownerSelect.value = currentOwnerVal;
+  }
+
+  onOwnerChange(ownerSelect);
+}
+
+function onOwnerChange(ownerElem) {
+  const tr = ownerElem.closest('tr');
+  if (!tr) return;
+
+  const levelSelect = tr.querySelector('.kpi-level');
+  const parentSelect = tr.querySelector('.kpi-parent') || tr.querySelector('.kpi-parent-select');
+  const responSelect = tr.querySelector('.kpi-respon') || tr.querySelector('.kpi-child-select');
+
+  if (!levelSelect || !responSelect) return;
+
+  const selectedLevel = levelSelect.value;
+  const parentId = parentSelect ? parentSelect.value : '';
+  const selectedOwner = ownerElem.value;
+  const currentResponVal = responSelect.value;
+
+  responSelect.innerHTML = `<option value="">-- Pilih Respon KPI ${selectedLevel} --</option>`;
+
+  if (!selectedOwner) {
+    responSelect.disabled = true;
+    return;
+  }
+
+  let eligibleNodes = [];
+  if (selectedLevel === 'L1') {
+    eligibleNodes = Array.from(document.querySelectorAll('#treeContainer > [data-level="L1"]'));
+  } else if (parentId) {
+    const parentNode = document.getElementById(parentId);
+    if (parentNode) {
+      eligibleNodes = Array.from(parentNode.querySelectorAll(`:scope > .children-container > [data-level="${selectedLevel}"]`));
+    }
+  }
+
+  let countKPI = 0;
+  eligibleNodes.forEach(node => {
+    const nodeOwnerElem = node.querySelector('.node-owner');
+    const nodeTitleElem = node.querySelector('.node-title');
+    const nodeOwner = nodeOwnerElem ? nodeOwnerElem.value.trim() : '';
+    const nodeTitle = nodeTitleElem ? nodeTitleElem.value.trim() : '';
+
+    if (nodeOwner === selectedOwner && nodeTitle) {
+      const opt = document.createElement('option');
+      opt.value = node.id;
+      opt.textContent = nodeTitle;
+      responSelect.appendChild(opt);
+      countKPI++;
+    }
+  });
+
+  responSelect.disabled = countKPI === 0;
+
+  if (currentResponVal && Array.from(responSelect.options).some(o => o.value === currentResponVal)) {
+    responSelect.value = currentResponVal;
+  }
+}
+
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
 // ==========================================
@@ -228,7 +312,6 @@ function loadDraft() {
 
     const draftData = JSON.parse(saved);
 
-    // Restore Kluster
     if (draftData.cluster) {
       const clusterSelect = document.getElementById('clusterSelect');
       if (clusterSelect) {
@@ -237,7 +320,6 @@ function loadDraft() {
       }
     }
 
-    // Restore Page 1 (Tree Builder)
     if (draftData.treeData && draftData.treeData.length > 0) {
       const container = document.getElementById('treeContainer');
       if (container) {
@@ -248,45 +330,12 @@ function loadDraft() {
       }
     }
 
-    // Restore Page 2 (Form Detail Tabel)
     if (draftData.formData) {
       const tbody = document.getElementById('kpiTableBody');
       if (tbody) {
         tbody.innerHTML = '';
         draftData.formData.forEach(item => {
-          addKPIRow();
-          const tr = tbody.lastElementChild;
-
-          if (tr) {
-            const levelSelect = tr.querySelector('.kpi-level');
-            if (levelSelect) {
-              levelSelect.value = item.level;
-              onLevelSelectChange(levelSelect);
-            }
-
-            const parentSelect = tr.querySelector('.kpi-parent-select');
-            if (parentSelect && item.parent) {
-              parentSelect.value = item.parent;
-              onParentSelectChange(parentSelect);
-            }
-
-            const ownerSelect = tr.querySelector('.kpi-owner-select');
-            if (ownerSelect && item.owner) {
-              ownerSelect.value = item.owner;
-              onOwnerSelectChange(ownerSelect);
-            }
-
-            const childSelect = tr.querySelector('.kpi-child-select');
-            if (childSelect && item.child) {
-              childSelect.value = item.child;
-            }
-
-            const targetInput = tr.querySelector('.kpi-target');
-            if (targetInput) targetInput.value = item.target || '';
-
-            const bobotInput = tr.querySelector('.kpi-bobot');
-            if (bobotInput) bobotInput.value = item.bobot || 0;
-          }
+          addKPIRow(item);
         });
       }
     }
@@ -313,7 +362,6 @@ function showDraftNotice(msg) {
   }
 }
 
-// SERIALISASI POHON & FORM
 function serializeTree(containerElem) {
   const nodes = [];
   const childNodes = containerElem.querySelectorAll(':scope > .node-block');
@@ -354,7 +402,7 @@ function deserializeNode(data) {
       <div class="flex items-center gap-3">
         <span class="${badgeColorMap[data.level]} font-black px-2.5 py-1 rounded-lg text-xs shrink-0 shadow-sm">${data.level}</span>
         ${renderOwnerField(data.level)}
-        <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1.5 text-sm font-semibold node-title" placeholder="Nama KPI ${data.level}..." value="${data.title || ''}">
+        <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1.5 text-sm font-semibold node-title" placeholder="Nama KPI ${data.level}..." value="${data.title || ''}" onkeyup="populateParentDropdowns()">
         ${addButtonHTML}
         <button type="button" onclick="removeTreeNode('${data.id}')" class="text-rose-600 hover:text-rose-800 px-2 transition-colors"><i class="fa-solid fa-trash"></i></button>
       </div>
@@ -383,11 +431,15 @@ function serializeForm() {
   let items = [];
 
   rows.forEach(tr => {
+    const parentSelect = tr.querySelector('.kpi-parent') || tr.querySelector('.kpi-parent-select');
+    const ownerSelect = tr.querySelector('.kpi-owner') || tr.querySelector('.kpi-owner-select');
+    const responSelect = tr.querySelector('.kpi-respon') || tr.querySelector('.kpi-child-select');
+
     items.push({
       level: tr.querySelector('.kpi-level') ? tr.querySelector('.kpi-level').value : '',
-      parent: tr.querySelector('.kpi-parent-select') ? tr.querySelector('.kpi-parent-select').value : '',
-      owner: tr.querySelector('.kpi-owner-select') ? tr.querySelector('.kpi-owner-select').value : '',
-      child: tr.querySelector('.kpi-child-select') ? tr.querySelector('.kpi-child-select').value : '',
+      parent: parentSelect ? parentSelect.value : '',
+      owner: ownerSelect ? ownerSelect.value : '',
+      child: responSelect ? responSelect.value : '',
       target: tr.querySelector('.kpi-target') ? tr.querySelector('.kpi-target').value : '',
       bobot: tr.querySelector('.kpi-bobot') ? tr.querySelector('.kpi-bobot').value : 0
     });
@@ -423,6 +475,7 @@ function switchTab(tabIndex) {
 
   if (tabIndex === 2) {
     updateAllKPIRowsRules();
+    populateParentDropdowns();
     runValidation();
   } else if (tabIndex === 3) {
     renderInteractiveTree();
@@ -433,26 +486,24 @@ function changeCluster() {
   const clusterSelect = document.getElementById('clusterSelect');
   if (!clusterSelect) return;
 
-  const activeCluster = clusterSelect.value;
+  currentCluster = clusterSelect.value;
 
-  // Update opsi level pada baris tabel Halaman 2 yang sudah ada
   const levelSelects = document.querySelectorAll('#kpiTableBody .kpi-level');
   levelSelects.forEach(select => {
     if (typeof generateLevelOptions === 'function') {
       const currentVal = select.value;
       select.innerHTML = generateLevelOptions();
       
-      // Kembalikan nilai jika masih valid
       const hasOption = Array.from(select.options).some(opt => opt.value === currentVal && !opt.disabled);
       if (hasOption) select.value = currentVal;
     }
   });
 
-  // Jalankan ulang validasi aturan
   if (typeof runValidation === 'function') {
     runValidation();
   }
 }
+
 function renderOwnerField(level) {
   if (level === 'L1') {
     return `<input type="text" readonly value="ADHI" class="node-owner w-32 glass-input text-gray-700 rounded-lg px-2.5 py-1 text-xs font-bold">`;
@@ -462,7 +513,7 @@ function renderOwnerField(level) {
     return `<input type="text" readonly value="DEPARTEMEN HC" class="node-owner w-40 glass-input text-gray-700 rounded-lg px-2.5 py-1 text-xs font-bold">`;
   } else if (level === 'L4') {
     return `
-      <select class="node-owner border rounded-lg px-2.5 py-1 text-xs font-bold glass-input text-teal-900">
+      <select class="node-owner border rounded-lg px-2.5 py-1 text-xs font-bold glass-input text-teal-900" onchange="populateParentDropdowns()">
         <option value="BOSH">BOSH</option>
         <option value="BPHC">BPHC</option>
         <option value="BMT">BMT</option>
@@ -470,7 +521,7 @@ function renderOwnerField(level) {
       </select>
     `;
   } else if (level === 'L5') {
-    return `<input type="text" placeholder="Fungsi Biro..." class="node-owner w-36 glass-input text-gray-800 rounded-lg px-2.5 py-1 text-xs font-semibold">`;
+    return `<input type="text" placeholder="Fungsi Biro..." class="node-owner w-36 glass-input text-gray-800 rounded-lg px-2.5 py-1 text-xs font-semibold" onkeyup="populateParentDropdowns()">`;
   }
 }
 
@@ -485,11 +536,11 @@ function addL1Root() {
   const rootId = 'node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
 
   const rootHTML = `
-    <div class="glass-card rounded-2xl p-4 border-l-4 border-palette-teal relative node-block shadow-md" id="${rootId}" data-level="L1">
+    <div class="glass-card rounded-2xl p-4 border-l-4 border-palette-teal relative node-block shadow-md my-2" id="${rootId}" data-level="L1">
       <div class="flex items-center gap-3">
         <span class="bg-palette-teal text-white font-black px-2.5 py-1 rounded-lg text-xs shrink-0 shadow-sm">L1</span>
         ${renderOwnerField('L1')}
-        <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1.5 text-sm font-semibold node-title" placeholder="Nama KPI Level 1 (Korporasi)...">
+        <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1.5 text-sm font-semibold node-title" placeholder="Nama KPI Level 1 (Korporasi)..." onkeyup="populateParentDropdowns()">
         <button type="button" onclick="addChildNode('${rootId}', 'L2')" class="btn-coral text-white text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 shadow-sm flex items-center gap-1">
           <i class="fa-solid fa-plus"></i> Respon L2
         </button>
@@ -521,11 +572,11 @@ function addChildNode(parentId, childLevel) {
   ` : '';
 
   const childHTML = `
-    <div class="glass-card rounded-xl p-3 border-l-4 ${borderColorMap[childLevel]} relative node-block shadow-sm" id="${childId}" data-level="${childLevel}">
+    <div class="glass-card rounded-xl p-3 border-l-4 ${borderColorMap[childLevel]} relative node-block shadow-sm my-2" id="${childId}" data-level="${childLevel}">
       <div class="flex items-center gap-3">
         <span class="${badgeColorMap[childLevel]} font-bold px-2 py-0.5 rounded-lg text-[11px] shrink-0 shadow-sm">${childLevel}</span>
         ${renderOwnerField(childLevel)}
-        <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1 text-sm font-medium node-title" placeholder="Nama Respon KPI ${childLevel}...">
+        <input type="text" class="flex-1 glass-input rounded-lg px-3 py-1 text-sm font-medium node-title" placeholder="Nama Respon KPI ${childLevel}..." onkeyup="populateParentDropdowns()">
         ${addButtonHTML}
         <button type="button" onclick="removeTreeNode('${childId}')" class="text-rose-600 hover:text-rose-800 px-2 text-xs transition-colors"><i class="fa-solid fa-trash"></i></button>
       </div>
@@ -538,7 +589,10 @@ function addChildNode(parentId, childLevel) {
 
 function removeTreeNode(nodeId) {
   const node = document.getElementById(nodeId);
-  if (node) node.remove();
+  if (node) {
+    node.remove();
+    populateParentDropdowns();
+  }
 }
 
 // ==========================================
@@ -552,10 +606,9 @@ function addKPIRow(data = {}) {
   const tr = document.createElement('tr');
   tr.className = "border-b border-gray-100 hover:bg-slate-50/50 transition";
 
-  // Gunakan generateLevelOptions() agar selalu sinkron dengan kluster aktif
   tr.innerHTML = `
     <td class="p-2">
-      <select class="kpi-level glass-input text-xs font-semibold text-slate-700 rounded-lg p-1.5 w-full" onchange="runValidation()">
+      <select class="kpi-level glass-input text-xs font-semibold text-slate-700 rounded-lg p-1.5 w-full" onchange="onLevelSelectChange(this)">
         ${generateLevelOptions()}
       </select>
     </td>
@@ -589,16 +642,42 @@ function addKPIRow(data = {}) {
 
   tbody.appendChild(tr);
 
-  // Set nilai level jika ada data (misal saat import/load)
   if (data.level) {
     const levelSelect = tr.querySelector('.kpi-level');
     if (levelSelect) levelSelect.value = data.level;
   }
 
-  // Panggil validasi dan pemutakhiran dropdown parent
+  populateParentDropdown(tr);
+
+  if (data.parent) {
+    const parentSelect = tr.querySelector('.kpi-parent');
+    if (parentSelect) {
+      parentSelect.value = data.parent;
+      onParentChange(parentSelect);
+    }
+  }
+
+  if (data.owner) {
+    const ownerSelect = tr.querySelector('.kpi-owner');
+    if (ownerSelect) {
+      ownerSelect.value = data.owner;
+      onOwnerChange(ownerSelect);
+    }
+  }
+
+  if (data.child) {
+    const responSelect = tr.querySelector('.kpi-respon');
+    if (responSelect) responSelect.value = data.child;
+  }
+
   runValidation();
-  if (typeof populateParentDropdowns === 'function') {
-    populateParentDropdowns();
+}
+
+function deleteRow(btn) {
+  const tr = btn.closest('tr');
+  if (tr) {
+    tr.remove();
+    runValidation();
   }
 }
 
@@ -637,161 +716,10 @@ function onLevelSelectChange(selectElem) {
   runValidation();
 }
 
-function populateParentDropdowns() {
-  const container = document.getElementById('treeContainer');
-  if (!container) return;
-
-  // 1. Kumpulkan semua node KPI yang ada di Halaman 1 (Visual Tree)
-  // Mencari elemen berdasarkan class node / dataset / id
-  const allNodes = container.querySelectorAll('.tree-node, [data-id], .kpi-card, div[id^="node-"]');
-  const parentOptions = [];
-
-  allNodes.forEach(node => {
-    // Ambil ID Node
-    const id = node.dataset.id || node.getAttribute('data-id') || node.id;
-    
-    // Ambil Level KPI (L1, L2, L3, dll.)
-    const levelElement = node.querySelector('.kpi-level, .node-level, [class*="level"]') || node;
-    let level = node.dataset.level || node.getAttribute('data-level') || levelElement.innerText || '';
-    level = level.match(/L[1-5]/i) ? level.match(/L[1-5]/i)[0].toUpperCase() : '';
-
-    // Ambil Nama/Judul KPI
-    const titleElement = node.querySelector('input, .kpi-title, .node-title, strong, h4') || node;
-    let title = node.dataset.title || node.getAttribute('data-title') || titleElement.value || titleElement.innerText || '';
-    title = title.replace(/^(L[1-5])\s*/i, '').trim(); // Bersihkan prefix level jika ada
-
-    // Jika ID dan Title valid, simpan ke daftar opsi
-    if (id && title && title !== '-- Pilih Induk --') {
-      parentOptions.push({ id, level, title });
-    }
-  });
-
-  // 2. Refresh seluruh Dropdown "KPI Induk (Parent)" di Halaman 2 (Form Detail KPI)
-  const parentSelects = document.querySelectorAll('#kpiTableBody .kpi-parent, .parent-select');
-
-  parentSelects.forEach(select => {
-    const currentValue = select.value; // Simpan nilai yang sedang terpilih (jika ada)
-
-    // Reset isi dropdown
-    select.innerHTML = '<option value="">-- Pilih Induk --</option>';
-
-    // Masukkan opsi node yang berhasil dikumpulkan
-    parentOptions.forEach(opt => {
-      const optionElement = document.createElement('option');
-      optionElement.value = opt.id;
-      optionElement.textContent = opt.level ? `[${opt.level}] ${opt.title}` : opt.title;
-      select.appendChild(optionElement);
-    });
-
-    // Kembalikan opsi terpilih jika nilainya masih ada di daftar baru
-    if (currentValue && Array.from(select.options).some(o => o.value === currentValue)) {
-      select.value = currentValue;
-    }
-  });
-}
-
-function onParentSelectChange(selectElem) {
-  const tr = selectElem.closest('tr');
-  if (tr) populateOwnerDropdown(tr);
-}
-
-function populateOwnerDropdown(tr) {
-  const selectedLevel = tr.querySelector('.kpi-level').value;
-  const parentId = tr.querySelector('.kpi-parent-select').value;
-  const ownerSelect = tr.querySelector('.kpi-owner-select');
-  if (!ownerSelect) return;
-
-  ownerSelect.innerHTML = `<option value="">-- Pilih Owner --</option>`;
-
-  let eligibleNodes = [];
-  if (selectedLevel === 'L1') {
-    eligibleNodes = Array.from(document.querySelectorAll('#treeContainer > [data-level="L1"]'));
-  } else if (parentId) {
-    const parentNode = document.getElementById(parentId);
-    if (parentNode) {
-      eligibleNodes = Array.from(parentNode.querySelectorAll(`:scope > .children-container > [data-level="${selectedLevel}"]`));
-    }
-  }
-
-  const uniqueOwners = new Set();
-  eligibleNodes.forEach(node => {
-    const ownerElem = node.querySelector('.node-owner');
-    const ownerVal = ownerElem ? ownerElem.value.trim() : '';
-    if (ownerVal) uniqueOwners.add(ownerVal);
-  });
-
-  uniqueOwners.forEach(ownerName => {
-    const opt = document.createElement('option');
-    opt.value = ownerName;
-    opt.textContent = ownerName;
-    ownerSelect.appendChild(opt);
-  });
-
-  if (uniqueOwners.size === 1) {
-    ownerSelect.selectedIndex = 1;
-  }
-
-  populateChildDropdown(tr);
-}
-
-function onOwnerSelectChange(selectElem) {
-  const tr = selectElem.closest('tr');
-  if (tr) populateChildDropdown(tr);
-}
-
-function populateChildDropdown(tr) {
-  const selectedLevel = tr.querySelector('.kpi-level').value;
-  const parentId = tr.querySelector('.kpi-parent-select').value;
-  const selectedOwner = tr.querySelector('.kpi-owner-select').value;
-  const childSelect = tr.querySelector('.kpi-child-select');
-  if (!childSelect) return;
-
-  childSelect.innerHTML = `<option value="">-- Pilih Respon KPI ${selectedLevel} --</option>`;
-
-  if (!selectedOwner) {
-    childSelect.disabled = true;
-    return;
-  }
-
-  let eligibleNodes = [];
-  if (selectedLevel === 'L1') {
-    eligibleNodes = Array.from(document.querySelectorAll('#treeContainer > [data-level="L1"]'));
-  } else if (parentId) {
-    const parentNode = document.getElementById(parentId);
-    if (parentNode) {
-      eligibleNodes = Array.from(parentNode.querySelectorAll(`:scope > .children-container > [data-level="${selectedLevel}"]`));
-    }
-  }
-
-  let countKPI = 0;
-  eligibleNodes.forEach(node => {
-    const nodeOwnerElem = node.querySelector('.node-owner');
-    const nodeTitleElem = node.querySelector('.node-title');
-    const nodeOwner = nodeOwnerElem ? nodeOwnerElem.value.trim() : '';
-    const nodeTitle = nodeTitleElem ? nodeTitleElem.value.trim() : '';
-
-    if (nodeOwner === selectedOwner && nodeTitle) {
-      const opt = document.createElement('option');
-      opt.value = node.id;
-      opt.textContent = nodeTitle;
-      childSelect.appendChild(opt);
-      countKPI++;
-    }
-  });
-
-  childSelect.disabled = countKPI === 0;
-}
-
-function removeRow(id) {
-  const row = document.getElementById(id);
-  if (row) row.remove();
-}
-
 function runValidation() {
   const clusterSelect = document.getElementById('clusterSelect');
-  const activeCluster = clusterSelect ? clusterSelect.value : 'BOD-3';
+  const activeCluster = clusterSelect ? clusterSelect.value : currentCluster;
 
-  // 1. Ambil data dari tabel Halaman 2
   const rows = document.querySelectorAll('#kpiTableBody tr');
   const items = [];
 
@@ -807,14 +735,11 @@ function runValidation() {
     }
   });
 
-  // 2. Jalankan fungsi validasi langsung (akan langsung mengecek batas % min & max walau items masih kosong)
   const result = typeof validateKPI === 'function' ? validateKPI(activeCluster, items) : { isValid: false, errors: [] };
 
-  // 3. Hitung Item Non-L1/L2 & Total Bobot untuk Counter
   const itemsNonL1L2 = items.filter(item => ['L3', 'L4', 'L5'].includes(item.jenis));
   const totalBobot = items.reduce((sum, item) => sum + (parseFloat(item.bobot) || 0), 0);
 
-  // 4. Update Angka di UI Counter Sidebar
   const itemCounter = document.getElementById('itemCounter');
   if (itemCounter) {
     itemCounter.textContent = `${itemsNonL1L2.length} / Max 15 Item (L3-L5)`;
@@ -825,13 +750,12 @@ function runValidation() {
     bobotCounter.textContent = `${totalBobot}% / 100%`;
   }
 
-  // 5. Render Catatan Kepatuhan Langsung di HTML
   const validationBox = document.getElementById('validationBox');
   const pdfBtn = document.getElementById('pdfBtn');
 
   if (!validationBox) return;
 
-  validationBox.innerHTML = ''; // Kosongkan wadah sebelum diisi ulang
+  validationBox.innerHTML = '';
 
   if (result.isValid) {
     validationBox.innerHTML = `
@@ -839,7 +763,6 @@ function runValidation() {
         <i class="fa-solid fa-circle-check"></i> Semua kriteria KPI kluster ${activeCluster} terpenuhi!
       </li>`;
   } else {
-    // Tampilkan seluruh daftar error/peringatan dari validateKPI
     result.errors.forEach(err => {
       validationBox.innerHTML += `
         <li class="text-rose-600 flex items-start gap-1.5 font-semibold">
@@ -849,40 +772,8 @@ function runValidation() {
     });
   }
 
-  // 6. Update status tombol PDF
   if (pdfBtn) {
     pdfBtn.disabled = !result.isValid;
-  }
-}
-
-// Panggil langsung saat pertama kali web dimuat
-document.addEventListener('DOMContentLoaded', () => {
-  runValidation();
-});
-
-function updateSidebarUI(result, items) {
-  let totalBobot = items.reduce((acc, curr) => acc + curr.bobot, 0);
-  let countL35 = items.filter(i => ['L3','L4','L5'].includes(i.jenis)).length;
-
-  const itemCounter = document.getElementById('itemCounter');
-  const bobotCounter = document.getElementById('bobotCounter');
-  if (itemCounter) itemCounter.textContent = `${countL35} / (8 - 15 Item)`;
-  if (bobotCounter) bobotCounter.textContent = `${totalBobot}% / 100%`;
-
-  const pdfBtn = document.getElementById('pdfBtn');
-  const valBox = document.getElementById('validationBox');
-
-  if (!valBox) return;
-  valBox.innerHTML = '';
-
-  if (result.isValid) {
-    if (pdfBtn) pdfBtn.disabled = false;
-    valBox.innerHTML = `<li class="p-3 rounded-xl bg-teal-500/20 text-teal-900 border border-teal-500/30 font-bold flex items-center gap-2 shadow-sm"><i class="fa-solid fa-circle-check text-palette-teal"></i> Form valid & siap di-download!</li>`;
-  } else {
-    if (pdfBtn) pdfBtn.disabled = true;
-    result.errors.forEach(err => {
-      valBox.innerHTML += `<li class="p-2.5 rounded-xl bg-coral-500/20 text-rose-900 border border-coral-500/30 flex items-start gap-2 shadow-sm"><i class="fa-solid fa-circle-xmark text-palette-coral mt-0.5"></i> <span>${err}</span></li>`;
-    });
   }
 }
 
@@ -895,15 +786,15 @@ function exportToExcel() {
   let excelData = [];
 
   rows.forEach(tr => {
-    const parentSelect = tr.querySelector('.kpi-parent-select');
-    const childSelect = tr.querySelector('.kpi-child-select');
-    const ownerSelect = tr.querySelector('.kpi-owner-select');
+    const parentSelect = tr.querySelector('.kpi-parent') || tr.querySelector('.kpi-parent-select');
+    const responSelect = tr.querySelector('.kpi-respon') || tr.querySelector('.kpi-child-select');
+    const ownerSelect = tr.querySelector('.kpi-owner') || tr.querySelector('.kpi-owner-select');
     const targetInput = tr.querySelector('.kpi-target');
     const bobotInput = tr.querySelector('.kpi-bobot');
 
     const parentText = (!parentSelect || parentSelect.disabled) ? '-' : (parentSelect.options[parentSelect.selectedIndex]?.text || '-');
     const ownerText = ownerSelect ? (ownerSelect.value || '-') : '-';
-    const childText = childSelect ? (childSelect.options[childSelect.selectedIndex]?.text || '-') : '-';
+    const childText = responSelect ? (responSelect.options[responSelect.selectedIndex]?.text || '-') : '-';
 
     excelData.push({
       "Level": tr.querySelector('.kpi-level') ? tr.querySelector('.kpi-level').value : '-',
@@ -931,15 +822,15 @@ function exportToPDF() {
 
   let tableRowsHTML = '';
   document.querySelectorAll('#kpiTableBody tr').forEach(tr => {
-    const parentSelect = tr.querySelector('.kpi-parent-select');
-    const childSelect = tr.querySelector('.kpi-child-select');
-    const ownerSelect = tr.querySelector('.kpi-owner-select');
+    const parentSelect = tr.querySelector('.kpi-parent') || tr.querySelector('.kpi-parent-select');
+    const responSelect = tr.querySelector('.kpi-respon') || tr.querySelector('.kpi-child-select');
+    const ownerSelect = tr.querySelector('.kpi-owner') || tr.querySelector('.kpi-owner-select');
     const targetInput = tr.querySelector('.kpi-target');
     const bobotInput = tr.querySelector('.kpi-bobot');
 
     const parentText = (!parentSelect || parentSelect.disabled) ? '-' : (parentSelect.options[parentSelect.selectedIndex]?.text || '-');
     const ownerText = ownerSelect ? (ownerSelect.value || '-') : '-';
-    const childText = childSelect ? (childSelect.options[childSelect.selectedIndex]?.text || '-') : '-';
+    const childText = responSelect ? (responSelect.options[responSelect.selectedIndex]?.text || '-') : '-';
 
     tableRowsHTML += `
       <tr>
@@ -1045,25 +936,25 @@ function buildNodeTreeHTML(node) {
     </div>
   `;
 }
-// Fungsi untuk merender opsi dropdown Level berdasarkan Kluster Aktif
+
 function generateLevelOptions() {
   const clusterSelect = document.getElementById('clusterSelect');
-  const activeCluster = clusterSelect ? clusterSelect.value : 'BOD-3';
-  const rules = KPI_RULES[activeCluster];
-
-  if (!rules) return '';
+  const activeCluster = clusterSelect ? clusterSelect.value : currentCluster;
+  const rules = (typeof KPI_RULES !== 'undefined') ? KPI_RULES[activeCluster] : null;
 
   const levels = ['L1', 'L2', 'L3', 'L4', 'L5'];
   let optionsHTML = '';
 
   levels.forEach(level => {
-    const rule = rules[level];
-    if (rule.min === 0 && rule.max === 0) {
-      // Jika diblokir (0%), beri label (Disabled) dan atur atribut disabled
-      optionsHTML += `<option value="${level}" disabled>${level} (Disabled)</option>`;
+    if (rules && rules[level]) {
+      const rule = rules[level];
+      if (rule.min === 0 && rule.max === 0) {
+        optionsHTML += `<option value="${level}" disabled>${level} (Disabled)</option>`;
+      } else {
+        optionsHTML += `<option value="${level}">${level} (${rule.min}% - ${rule.max}%)</option>`;
+      }
     } else {
-      // Tampilkan rentang min - max yang sesuai matriks
-      optionsHTML += `<option value="${level}">${level} (${rule.min}% - ${rule.max}%)</option>`;
+      optionsHTML += `<option value="${level}">${level}</option>`;
     }
   });
 
