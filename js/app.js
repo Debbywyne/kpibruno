@@ -717,19 +717,73 @@ function removeRow(id) {
 }
 
 function runValidation() {
-  const rows = document.querySelectorAll('#kpiTableBody tr');
-  let items = [];
+  const clusterSelect = document.getElementById('clusterSelect');
+  const activeCluster = clusterSelect ? clusterSelect.value : 'BOD-3';
+  const rule = getActiveClusterRule(activeCluster);
 
-  rows.forEach(tr => {
-    const levelElem = tr.querySelector('.kpi-level');
-    const bobotElem = tr.querySelector('.kpi-bobot');
-    const jenis = levelElem ? levelElem.value : 'L3';
-    const bobot = bobotElem ? parseFloat(bobotElem.value) || 0 : 0;
-    items.push({ jenis, bobot });
+  const rows = document.querySelectorAll('#kpiTableBody tr');
+  const itemCount = rows.length;
+
+  let totalBobot = 0;
+  rows.forEach(row => {
+    const bobotInput = row.querySelector('.kpi-bobot');
+    if (bobotInput) {
+      totalBobot += parseFloat(bobotInput.value) || 0;
+    }
   });
 
-  const result = typeof validateKPI !== 'undefined' ? validateKPI(currentCluster, items) : { isValid: true, errors: [] };
-  updateSidebarUI(result, items);
+  // Update UI Counter
+  const itemCounter = document.getElementById('itemCounter');
+  if (itemCounter) {
+    itemCounter.textContent = `${itemCount} / (${rule.minItems} - ${rule.maxItems} Item)`;
+  }
+
+  const bobotCounter = document.getElementById('bobotCounter');
+  if (bobotCounter) {
+    bobotCounter.textContent = `${totalBobot}% / ${rule.targetBobot}%`;
+  }
+
+  // Generate Pesan Validasi
+  const validationBox = document.getElementById('validationBox');
+  const pdfBtn = document.getElementById('pdfBtn');
+
+  if (!validationBox) return;
+
+  validationBox.innerHTML = '';
+  let isValid = true;
+
+  // 1. Cek Jumlah Item
+  if (itemCount < rule.minItems || itemCount > rule.maxItems) {
+    isValid = false;
+    validationBox.innerHTML += `
+      <li class="text-rose-600 flex items-center gap-1.5 font-semibold">
+        <i class="fa-solid fa-triangle-exclamation"></i> Jumlah item (${itemCount}) harus antara ${rule.minItems} - ${rule.maxItems} item untuk ${activeCluster}.
+      </li>`;
+  } else {
+    validationBox.innerHTML += `
+      <li class="text-emerald-700 flex items-center gap-1.5 font-semibold">
+        <i class="fa-solid fa-circle-check"></i> Jumlah item KPI sudah memenuhi kriteria (${itemCount} item).
+      </li>`;
+  }
+
+  // 2. Cek Total Bobot
+  if (totalBobot !== rule.targetBobot) {
+    isValid = false;
+    validationBox.innerHTML += `
+      <li class="text-rose-600 flex items-center gap-1.5 font-semibold">
+        <i class="fa-solid fa-triangle-exclamation"></i> Total bobot harus persis ${rule.targetBobot}% (Saat ini: ${totalBobot}%).
+      </li>`;
+  } else {
+    validationBox.innerHTML += `
+      <li class="text-emerald-700 flex items-center gap-1.5 font-semibold">
+        <i class="fa-solid fa-circle-check"></i> Total bobot sudah 100%.
+      </li>`;
+  }
+
+  // Enable / Disable Tombol PDF berdasarkan validasi
+  if (pdfBtn) {
+    pdfBtn.disabled = !isValid;
+  }
 }
 
 function updateSidebarUI(result, items) {
