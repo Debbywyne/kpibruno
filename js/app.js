@@ -730,7 +730,7 @@ function runValidation() {
   const clusterSelect = document.getElementById('clusterSelect');
   const activeCluster = clusterSelect ? clusterSelect.value : 'BOD-3';
 
-  // 1. Ambil semua data baris dari tabel Halaman 2
+  // 1. Ambil data dari tabel Halaman 2
   const rows = document.querySelectorAll('#kpiTableBody tr');
   const items = [];
 
@@ -746,10 +746,10 @@ function runValidation() {
     }
   });
 
-  // 2. Jalankan fungsi validasi dari rules.js
-  const result = validateKPI(activeCluster, items);
+  // 2. Jalankan fungsi validasi langsung (akan langsung mengecek batas % min & max walau items masih kosong)
+  const result = typeof validateKPI === 'function' ? validateKPI(activeCluster, items) : { isValid: false, errors: [] };
 
-  // 3. Hitung Item Non-L1/L2 (L3, L4, L5) & Total Bobot untuk UI Counter
+  // 3. Hitung Item Non-L1/L2 & Total Bobot untuk Counter
   const itemsNonL1L2 = items.filter(item => ['L3', 'L4', 'L5'].includes(item.jenis));
   const totalBobot = items.reduce((sum, item) => sum + (parseFloat(item.bobot) || 0), 0);
 
@@ -764,13 +764,13 @@ function runValidation() {
     bobotCounter.textContent = `${totalBobot}% / 100%`;
   }
 
-  // 5. Tampilkan Pesan Hasil Validasi di UI
+  // 5. Render Catatan Kepatuhan Langsung di HTML
   const validationBox = document.getElementById('validationBox');
   const pdfBtn = document.getElementById('pdfBtn');
 
   if (!validationBox) return;
 
-  validationBox.innerHTML = '';
+  validationBox.innerHTML = ''; // Kosongkan wadah sebelum diisi ulang
 
   if (result.isValid) {
     validationBox.innerHTML = `
@@ -778,19 +778,26 @@ function runValidation() {
         <i class="fa-solid fa-circle-check"></i> Semua kriteria KPI kluster ${activeCluster} terpenuhi!
       </li>`;
   } else {
+    // Tampilkan seluruh daftar error/peringatan dari validateKPI
     result.errors.forEach(err => {
       validationBox.innerHTML += `
-        <li class="text-rose-600 flex items-center gap-1.5 font-semibold">
-          <i class="fa-solid fa-triangle-exclamation"></i> ${err}
+        <li class="text-rose-600 flex items-start gap-1.5 font-semibold">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+          <span>${err}</span>
         </li>`;
     });
   }
 
-  // 6. Kunci/Buka Tombol PDF berdasarkan status validasi
+  // 6. Update status tombol PDF
   if (pdfBtn) {
     pdfBtn.disabled = !result.isValid;
   }
 }
+
+// Panggil langsung saat pertama kali web dimuat
+document.addEventListener('DOMContentLoaded', () => {
+  runValidation();
+});
 
 function updateSidebarUI(result, items) {
   let totalBobot = items.reduce((acc, curr) => acc + curr.bobot, 0);
