@@ -130,43 +130,22 @@ function buildTreeFromExcelData(rows) {
   const container = document.getElementById('treeContainer');
   if (!container) return;
 
-  container.innerHTML = ''; // Restrukturasi ulang container
+  container.innerHTML = ''; 
 
   const nodeDOMMap = {};
 
   rows.forEach(row => {
-    const id = row['ID'] || ('node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4));
-    const level = row['Level'] ? String(row['Level']).toUpperCase().trim() : 'L1';
-    const owner = row['Unit Owner'] || '';
-    const title = row['Nama KPI'] || '';
-    const parentId = row['Parent ID'] ? String(row['Parent ID']).trim() : null;
-
-    const nodeData = {
-      id: id,
-      level: level,
-      owner: owner,
-      title: title,
-      children: []
-    };
-
-    const nodeElement = deserializeNode(nodeData);
-    nodeDOMMap[id] = nodeElement;
-
-    // Jika tidak memiliki Parent ID atau Parent ID tidak ditemukan, jadikan Root
-    if (!parentId || !nodeDOMMap[parentId]) {
-      container.appendChild(nodeElement);
-    } else {
-      // Jika memiliki Parent ID, masukkan ke dalam anak dari Parent tersebut
-      const parentElement = nodeDOMMap[parentId];
-      const childrenContainer = parentElement.querySelector('.children-container');
-      if (childrenContainer) {
-        childrenContainer.appendChild(nodeElement);
-      }
-    }
+    // ... (kode pembacaan baris excel kamu) ...
   });
 
-  // Jalankan sinkronisasi jika user beralih ke form detail / chart
-  if (typeof runValidation === 'function') runValidation();
+  // ==========================================
+  // TAMBAHKAN SINKRONISASI INI DI PALING BAWAH
+  // ==========================================
+  if (typeof changeCluster === 'function') {
+    changeCluster(); // Memaksa pembaruan seluruh dropdown level & validasi sesuai kluster aktif
+  } else {
+    runValidation();
+  }
 }
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
@@ -519,6 +498,7 @@ function addKPIRow(data = {}) {
   const tr = document.createElement('tr');
   tr.className = "border-b border-gray-100 hover:bg-slate-50/50 transition";
 
+  // Gunakan generateLevelOptions() agar selalu sinkron dengan kluster aktif
   tr.innerHTML = `
     <td class="p-2">
       <select class="kpi-level glass-input text-xs font-semibold text-slate-700 rounded-lg p-1.5 w-full" onchange="runValidation()">
@@ -526,12 +506,12 @@ function addKPIRow(data = {}) {
       </select>
     </td>
     <td class="p-2">
-      <select class="kpi-parent glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full">
+      <select class="kpi-parent glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full" onchange="onParentChange(this)">
         <option value="">-- Pilih Induk --</option>
       </select>
     </td>
     <td class="p-2">
-      <select class="kpi-owner glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full">
+      <select class="kpi-owner glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full" onchange="onOwnerChange(this)">
         <option value="">-- Pilih Owner --</option>
       </select>
     </td>
@@ -541,7 +521,7 @@ function addKPIRow(data = {}) {
       </select>
     </td>
     <td class="p-2">
-      <input type="text" class="kpi-target glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full" placeholder="Target...">
+      <input type="text" class="kpi-target glass-input text-xs text-slate-700 rounded-lg p-1.5 w-full" placeholder="Target..." value="${data.target || ''}">
     </td>
     <td class="p-2">
       <input type="number" class="kpi-bobot glass-input text-xs font-bold text-teal-900 rounded-lg p-1.5 w-20 text-center" value="${data.bobot || 0}" min="0" max="100" onchange="runValidation()" onkeyup="runValidation()">
@@ -555,14 +535,17 @@ function addKPIRow(data = {}) {
 
   tbody.appendChild(tr);
 
-  // Otomatis pilih level default pertama yang tidak disabled
-  const levelSelect = tr.querySelector('.kpi-level');
-  if (levelSelect) {
-    const firstEnabled = Array.from(levelSelect.options).find(opt => !opt.disabled);
-    if (firstEnabled) levelSelect.value = firstEnabled.value;
+  // Set nilai level jika ada data (misal saat import/load)
+  if (data.level) {
+    const levelSelect = tr.querySelector('.kpi-level');
+    if (levelSelect) levelSelect.value = data.level;
   }
 
+  // Panggil validasi dan pemutakhiran dropdown parent
   runValidation();
+  if (typeof populateParentDropdowns === 'function') {
+    populateParentDropdowns();
+  }
 }
 
 function updateAllKPIRowsRules() {
