@@ -22,7 +22,152 @@ document.addEventListener('DOMContentLoaded', () => {
     console.warn('LocalStorage tidak diizinkan atau tidak didukung di environment ini:', e);
   }
 });
+// ==========================================
+// 1. FUNGSI UNDUH TEMPLATE EXCEL BERSAMA CONTOH DATA
+// ==========================================
+function downloadExcelTemplate() {
+  if (typeof XLSX === 'undefined') {
+    alert('Library SheetJS belum dimuat!');
+    return;
+  }
 
+  // Sample Data mencakup kasus: 1 L1 direspon oleh 2 L2
+  const sampleData = [
+    {
+      "ID": "NODE-1",
+      "Level": "L1",
+      "Unit Owner": "ADHI",
+      "Nama KPI": "Meningkatkan Ebitda Korporasi",
+      "Parent ID": ""
+    },
+    {
+      "ID": "NODE-2",
+      "Level": "L2",
+      "Unit Owner": "DIREKTORAT HC DAN LEGAL",
+      "Nama KPI": "Optimalisasi Human Capital & HC Tech",
+      "Parent ID": "NODE-1" // Respon L2 Pertama ke NODE-1
+    },
+    {
+      "ID": "NODE-3",
+      "Level": "L2",
+      "Unit Owner": "DIREKTORAT KEUANGAN",
+      "Nama KPI": "Pengendalian Efisiensi Biaya Operasional",
+      "Parent ID": "NODE-1" // Respon L2 Kedua ke NODE-1
+    },
+    {
+      "ID": "NODE-4",
+      "Level": "L3",
+      "Unit Owner": "DEPARTEMEN HC",
+      "Nama KPI": "Implementasi Talent Management System",
+      "Parent ID": "NODE-2" // Anak dari Respon L2 Pertama
+    },
+    {
+      "ID": "NODE-5",
+      "Level": "L4",
+      "Unit Owner": "BOPH",
+      "Nama KPI": "Penyusunan Framework Competency & Leadership",
+      "Parent ID": "NODE-4"
+    },
+    {
+      "ID": "NODE-6",
+      "Level": "L3",
+      "Unit Owner": "DEPARTEMEN KEUANGAN",
+      "Nama KPI": "Penataan Liquidity Management & Cashflow",
+      "Parent ID": "NODE-3" // Anak dari Respon L2 Kedua
+    }
+  ];
+
+  const worksheet = XLSX.utils.json_to_sheet(sampleData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Template Tree KPI");
+
+  // Download File
+  XLSX.writeFile(workbook, "Template_Import_Tree_KPI.xlsx");
+}
+
+// ==========================================
+// 2. FUNGSI UNTUK MEMBACA DAN IMPORT FILE EXCEL
+// ==========================================
+function handleExcelImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+
+      const rows = XLSX.utils.sheet_to_json(worksheet);
+
+      if (rows.length === 0) {
+        alert('File Excel kosong atau format kolom tidak sesuai!');
+        return;
+      }
+
+      buildTreeFromExcelData(rows);
+
+      event.target.value = ''; // Reset input
+      showDraftNotice('Tree KPI berhasil di-import dari Excel!');
+
+    } catch (err) {
+      console.error('Gagal import file Excel:', err);
+      alert('Gagal memproses file Excel. Pastikan menggunakan format template yang benar.');
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+// ==========================================
+// 3. LOGIKA MEMBANGUN STRUKTUR TREE BERDASARKAN PARENT ID
+// ==========================================
+function buildTreeFromExcelData(rows) {
+  const container = document.getElementById('treeContainer');
+  if (!container) return;
+
+  container.innerHTML = ''; // Restrukturasi ulang container
+
+  const nodeDOMMap = {};
+
+  rows.forEach(row => {
+    const id = row['ID'] || ('node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4));
+    const level = row['Level'] ? String(row['Level']).toUpperCase().trim() : 'L1';
+    const owner = row['Unit Owner'] || '';
+    const title = row['Nama KPI'] || '';
+    const parentId = row['Parent ID'] ? String(row['Parent ID']).trim() : null;
+
+    const nodeData = {
+      id: id,
+      level: level,
+      owner: owner,
+      title: title,
+      children: []
+    };
+
+    const nodeElement = deserializeNode(nodeData);
+    nodeDOMMap[id] = nodeElement;
+
+    // Jika tidak memiliki Parent ID atau Parent ID tidak ditemukan, jadikan Root
+    if (!parentId || !nodeDOMMap[parentId]) {
+      container.appendChild(nodeElement);
+    } else {
+      // Jika memiliki Parent ID, masukkan ke dalam anak dari Parent tersebut
+      const parentElement = nodeDOMMap[parentId];
+      const childrenContainer = parentElement.querySelector('.children-container');
+      if (childrenContainer) {
+        childrenContainer.appendChild(nodeElement);
+      }
+    }
+  });
+
+  // Jalankan sinkronisasi jika user beralih ke form detail / chart
+  if (typeof runValidation === 'function') runValidation();
+}
 // ==========================================
 // FITUR SAVE & LOAD DRAFT GLOBAL
 // ==========================================

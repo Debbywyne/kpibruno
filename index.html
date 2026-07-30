@@ -79,6 +79,20 @@
 
     <!-- HALAMAN 1: TREE BUILDER PEMETAAN KPI -->
     <section id="page1" class="glass-card rounded-2xl p-6 shadow-xl mb-6">
+        <!-- Input File Tersembunyi untuk Upload -->
+<input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelImport(event)">
+
+<div class="flex items-center gap-2">
+  <!-- Tombol Download Template Excel -->
+  <button onclick="downloadExcelTemplate()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
+    <i class="fa-solid fa-file-arrow-down"></i> Unduh Template Excel
+  </button>
+
+  <!-- Tombol Import Excel -->
+  <button onclick="document.getElementById('excelFileInput').click()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5">
+    <i class="fa-solid fa-file-import"></i> Import Excel ke Tree
+  </button>
+</div>
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h2 class="text-xl font-bold text-teal-900 flex items-center gap-2">
